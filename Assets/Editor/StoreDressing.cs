@@ -472,7 +472,7 @@ static partial class GroceryStoreBuilder
             }
             // Gum and candy piled by the register.
             if (snacks.Count > 0) SetOnTop(counter, root, snacks, rng, new Vector3(b.max.x - b.size.x * 0.12f, 0, b.center.z), b.size.x * 0.12f, rng.Next(4, 8));
-            float poleH = CoolerHeight * 0.85f;
+            float poleH = Mathf.Max(CoolerHeight * 0.85f, b.max.y + 0.8f * Scale);
             var poleAt = new Vector3(b.max.x - 0.08f * Scale, b.max.y, b.center.z);
             Box("Lane Pole", root, poleAt + Vector3.up * (poleH - b.max.y) / 2, new Vector3(0.04f * Scale, poleH - b.max.y, 0.04f * Scale), pole);
             BacklitSign(root, new Vector3(poleAt.x, poleH + 0.15f * Scale, poleAt.z), Vector3.right, 0.35f * Scale, 0.3f * Scale,
@@ -481,14 +481,14 @@ static partial class GroceryStoreBuilder
             if (bagTypes.Count > 0) SetOnTop(counter, root, bagTypes, rng, new Vector3(b.min.x + b.size.x * 0.12f, 0, b.center.z), b.size.x * 0.15f, rng.Next(1, 3));
         }
 
-        float laneX = left + CheckoutWidth * 0.6f;
+        float laneX = left + CheckoutWidth * 0.58f;
         BacklitSign(root, new Vector3(laneX, WallHeight - 1.2f * Scale, 0), Vector3.right, 4.4f * Scale, 0.7f * Scale, "CHECKOUT", new Color(0.85f, 0.15f, 0.12f),
             twoSided: true, subtitle: "THANK YOU FOR SHOPPING", iconLeft: "cart", iconRight: "grocery");
 
         // Produce bins north of the door, snack bins at the ends of the lane block.
         for (int i = 0; i < 3; i++)
-            DisplayBin(root, new Vector3(left + CheckoutWidth * 0.25f, 0, (1.4f + i * 0.7f) * Scale + DoorWidth / 2), produce, rng, 1);
-        foreach (float z in new[] { -4.4f, 4.4f })
+            DisplayBin(root, new Vector3(left + CheckoutWidth * 0.25f, 0, (1.0f + i * 0.6f) * Scale + DoorWidth / 2), produce, rng, 1);
+        foreach (float z in new[] { -7f, 7f })
             DisplayBin(root, new Vector3(left + CheckoutWidth * 0.75f, 0, z * Scale), snacks, rng, 2);
 
         // Furniture around the door.
@@ -528,7 +528,7 @@ static partial class GroceryStoreBuilder
             (title: "FRESH PRODUCE", sub: "FROM LOCAL FARMS", icon: "apple", badge: "SALE", color: new Color(0.15f, 0.6f, 0.25f)),
         };
         for (int i = 0; i < posters.Length; i++)
-            BacklitSign(root, new Vector3(right - 0.05f * Scale, 1.9f * Scale, (-5.4f + i * 3.6f) * Scale), Vector3.left,
+            BacklitSign(root, new Vector3(right - 0.05f * Scale, 2.45f * Scale, (-5.4f + i * 3.6f) * Scale), Vector3.left, // above the wall shelf
                 2.6f * Scale, 1f * Scale, posters[i].title, posters[i].color,
                 subtitle: posters[i].sub, iconLeft: posters[i].icon, badge: posters[i].badge);
     }

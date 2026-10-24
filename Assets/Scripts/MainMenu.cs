@@ -20,6 +20,7 @@ public class MainMenu : MonoBehaviour
     {
         gameObject.SetActive(false);
         player.Teleport(spawnPoint.position, spawnPoint.rotation);
+        player.SetCheckpoint(spawnPoint.position, spawnPoint.rotation);
         player.enabled = true;
     }
 
