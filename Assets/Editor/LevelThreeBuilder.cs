@@ -47,7 +47,15 @@ static partial class GroceryStoreBuilder
         for (int i = 0; i < cubes; i++)
         {
             float z = Mathf.Lerp(poolA + 2.5f, poolB - 2.5f, i / (cubes - 1f));
-            IceCube(root, new Vector3(x + (i % 2 == 0 ? -4f : 4f), 0.4f, z), new Vector3(3.2f, 2f, 3.2f), bob: 0.2f);
+            var at = new Vector3(x + (i % 2 == 0 ? -4f : 4f), 0.4f, z);
+            if (i % 2 == 1)
+            {
+                var floe = IceCube(root, at + Vector3.left * 5f, new Vector3(3.2f, 2f, 3.2f), bob: 0);
+                floe.isStatic = false;
+                Kinematic(floe);
+                floe.AddComponent<MovingPlatform>().Setup(new Vector3(10f, 0, 0), 2f, 0.6f, i * 0.3f);
+            }
+            else IceCube(root, at, new Vector3(3.2f, 2f, 3.2f), bob: 0.2f);
         }
         CheckpointAt(root, "Checkpoint L3-A", new Vector3(x, 0, poolB + 3f), new Vector3(WalkwayWidth, 4, 3), 0);
 
@@ -61,12 +69,19 @@ static partial class GroceryStoreBuilder
         WhippedCream(root, new Vector3(x + 14.5f, 24f, bz + 14f), 24f);
         CheckpointAt(root, "Checkpoint L3-C", new Vector3(xE + fDepth / 2, FreezerHeight, bz + 22f), new Vector3(fDepth, 4, 4), 0);
 
+        var cube = IceCube(root, new Vector3(xE + fDepth * 0.5f, FreezerHeight + 0.95f, bz + 27f), new Vector3(1.9f, 1.9f, 1.9f), bob: 0);
+        cube.name = "Carry Ice Cube";
+        cube.isStatic = false;
+        cube.AddComponent<Carryable>();
+        LowIceWall(root, xE, xE + fDepth + 0.5f, bz + 33f, FreezerHeight, 3f);
+        devWarps.Add(("Ice Wall", new Vector3(xE + fDepth * 0.5f, FreezerHeight + 1f, bz + 23f), 0));
+
         var bags = Measure(new[] { ("k:bag", 0.25f), ("k:ice-cream-cup", 0.12f), ("IceCream", 0.15f), ("k:pizza-box", 0.35f) });
         for (int i = 0; i < 6 && bags.Count > 0; i++)
         {
             var t = bags[rng.Next(bags.Count)];
             var p = Spawn(t.prefab, root, rng.Next(360), t.size / Mathf.Max(t.bounds.x, t.bounds.y, t.bounds.z));
-            PlaceOnFloor(p, new Vector3(xE + fDepth * (0.3f + 0.4f * (float)rng.NextDouble()), FreezerHeight, bz + 30f + i * 7f));
+            PlaceOnFloor(p, new Vector3(xE + fDepth * (0.3f + 0.4f * (float)rng.NextDouble()), FreezerHeight, bz + 39f + i * 6f));
             AddBoxColliders(p);
         }
 
@@ -113,6 +128,20 @@ static partial class GroceryStoreBuilder
         Slide(root, new Vector3(xW - 2f, FreezerHeight, crossZ + 12f), new Vector3(x + 10f, 0.4f, zN - 6f), 5f);
         foreach (var r in root.Find("Baking Tray Slide").GetComponentsInChildren<Renderer>()) r.sharedMaterial = ice;
         root.Find("Baking Tray Slide").name = "Ice Slide";
+    }
+
+    // a wall of ice blocks across a freezer top, just too tall to jump
+    static void LowIceWall(Transform root, float x0, float x1, float z, float y, float height)
+    {
+        float w = x1 - x0;
+        int n = Mathf.Max(1, Mathf.RoundToInt(w / 3.5f));
+        for (int i = 0; i < n; i++)
+        {
+            var c = IceCube(root, new Vector3(x0 + (i + 0.5f) * w / n, y + height / 2, z), new Vector3(w / n * 0.97f, height, 2.6f), bob: 0);
+            c.name = "Ice Wall Block";
+            c.transform.rotation = Quaternion.identity;
+        }
+        Seal(root, "Ice Wall Collider", new Vector3((x0 + x1) / 2, y + height / 2, z), new Vector3(w, height, 2.6f));
     }
 
     static void FreezingWater(Transform root, float x, float zA, float zB)

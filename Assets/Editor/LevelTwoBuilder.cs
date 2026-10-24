@@ -76,7 +76,10 @@ static partial class GroceryStoreBuilder
 
         Ramp(root, new Vector3(hall.xW + 2.2f, hall.h1, 70f), new Vector3(hall.xW + 2.2f, hall.h2, 52f), 5.4f, true);
         CheckpointAt(root, "Checkpoint L2-B", new Vector3(hall.xW - 3.5f, hall.h2, 50f), new Vector3(6, 4, 4), 180);
-        RollingCan(root, new Vector3(hall.xW - 5.6f, hall.h2, 40f), new Vector3(4.4f, 0, 0), 1.0f, 0.2f);
+        RollingCan(root, new Vector3(hall.xW - 5.6f, hall.h2, 47.5f), new Vector3(4.4f, 0, 0), 1.0f, 0.2f);
+        CarryBox(root, new Vector3(hall.xW - 3.5f, hall.h2, 42.5f));
+        JarWall(root, hall.xW - hall.boardDepth - 0.5f, hall.xW + 0.6f, 36f, hall.h2, 3f);
+        devWarps.Add(("Jar Wall", new Vector3(hall.xW - 3.5f, hall.h2 + 1f, 50f), 180));
 
         Mop(root, new Vector3(hall.xW - 1f, hall.h2, 26f), new Vector3(hall.xE + 1f, hall.h2, 26f));
 
@@ -107,6 +110,23 @@ static partial class GroceryStoreBuilder
 
         WetFloorSign(root, new Vector3(hall.x - 6f, 0, zN - 6f), 200f);
         WetFloorSign(root, new Vector3(hall.x + 9f, 0, -zN + 3f), -20f);
+    }
+
+    // a row of jars across a shelf board, too tall to jump: carry a box over to step up
+    static void JarWall(Transform parent, float x0, float x1, float z, float y, float height)
+    {
+        var root = new GameObject("Jar Wall").transform;
+        root.SetParent(parent);
+        var jar = LoadModel("k:peanut-butter") ?? LoadModel("k:honey");
+        if (jar != null)
+            for (float x = x0 + 1.9f; x < x1 - 1.2f; x += 2.9f)
+            {
+                var j = Spawn(jar, root, (x * 37f) % 360f, 1f);
+                var b = GetBounds(j);
+                j.transform.localScale *= height / b.size.y;
+                PlaceOnFloor(j, new Vector3(x, y, z));
+            }
+        Seal(root, "Jar Wall Collider", new Vector3((x0 + x1) / 2, y + height / 2, z), new Vector3(x1 - x0, height, 2.8f));
     }
 
     static void JarBlock(Transform parent, Vector3 min, Vector3 max)

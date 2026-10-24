@@ -33,6 +33,7 @@ public class RoombaBoss : MonoBehaviour
     Vector3 target;
     bool rampWest, hasTarget;
     Vector3 homePos;
+    Bounds gateArea;
     Quaternion homeRot;
     float brushSpeed;
     const int Rays = 40;
@@ -63,6 +64,7 @@ public class RoombaBoss : MonoBehaviour
         if (ledRenderer != null) ledRenderer.material.SetColor("_EmissionColor", Color.black);
         homePos = transform.position;
         homeRot = transform.rotation;
+        if (gateSeal != null) gateArea = gateSeal.bounds;
     }
 
     void OnDestroy()
@@ -415,15 +417,43 @@ public class RoombaBoss : MonoBehaviour
     {
         if (gateSeal != null) gateSeal.enabled = false;
         if (gate == null) return;
+        var cc = player.GetComponent<CharacterController>();
         foreach (var c in gate.GetComponentsInChildren<Collider>())
         {
             if (c == gateSeal) continue;
+            if (cc != null) Physics.IgnoreCollision(cc, c, true);
             var body = c.attachedRigidbody != null ? c.attachedRigidbody : c.gameObject.AddComponent<Rigidbody>();
             body.isKinematic = false;
             body.mass = 2f;
-            body.AddForce(new Vector3(Random.Range(-3f, 3f), Random.Range(2f, 5f), Random.Range(4f, 9f)), ForceMode.VelocityChange);
+            body.AddForce(new Vector3(Random.Range(-18f, -9f), Random.Range(3f, 7f), Random.Range(-4f, 4f)), ForceMode.VelocityChange);
             body.AddTorque(Random.insideUnitSphere * 4f, ForceMode.VelocityChange);
         }
+        StartCoroutine(ClearGate());
+    }
+
+    IEnumerator ClearGate()
+    {
+        yield return new WaitForSeconds(3f);
+        foreach (var body in gate.GetComponentsInChildren<Rigidbody>())
+        {
+            var p = body.position;
+            if (p.x < gateArea.min.x - 1f || p.x > gateArea.max.x + 1f || p.z < gateArea.min.z - 1f || p.z > gateArea.max.z + 1f) continue;
+            StartCoroutine(Shrink(body));
+        }
+    }
+
+    static IEnumerator Shrink(Rigidbody body)
+    {
+        body.isKinematic = true;
+        foreach (var c in body.GetComponentsInChildren<Collider>()) c.enabled = false;
+        var t = body.transform;
+        var from = t.localScale;
+        for (float k = 0; k < 0.6f; k += Time.deltaTime)
+        {
+            t.localScale = from * (1f - k / 0.6f);
+            yield return null;
+        }
+        t.gameObject.SetActive(false);
     }
 
     IEnumerator HideCard(float after)

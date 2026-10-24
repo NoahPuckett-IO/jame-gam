@@ -202,7 +202,7 @@ static class MenuBuilder
         Aim(anim, HumanBodyBones.RightUpperArm, HumanBodyBones.RightLowerArm, HumanBodyBones.RightHand, body.right, body, -0.04f);
     }
 
-    static void Aim(Animator anim, HumanBodyBones upperBone, HumanBodyBones lowerBone, HumanBodyBones handBone, Vector3 outward, Transform body, float lift)
+    internal static void Aim(Animator anim, HumanBodyBones upperBone, HumanBodyBones lowerBone, HumanBodyBones handBone, Vector3 outward, Transform body, float lift)
     {
         var upper = anim.GetBoneTransform(upperBone);
         var lower = anim.GetBoneTransform(lowerBone);
