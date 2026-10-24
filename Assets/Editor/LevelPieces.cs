@@ -3,22 +3,14 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
-// Pieces shared by the levels: invisible seals that stop Henry going round an obstacle or climbing
-// the shelves to skip a section, moving and crumbling platforms, rolling cans, and a physics pass
-// that drops scattered groceries so they come to rest the way things that fell off a shelf would.
 static partial class GroceryStoreBuilder
 {
-    // ---------- Seals ----------
-
-    // An invisible wall. It's on the Ignore Raycast layer so the follow camera doesn't bump into it.
     static void Seal(Transform parent, string name, Vector3 center, Vector3 size)
     {
         Solid(parent, name, center, size);
         parent.GetChild(parent.childCount - 1).gameObject.layer = 2;
     }
 
-    // Floor-to-ceiling seals along both shelf faces of a walkway, so the shelves can't be climbed to
-    // get past the obstacles (or the falling groceries) below.
     static void ShelfGuards(Transform parent, float xc, float z0, float z1)
     {
         float zc = (z0 + z1) / 2, len = Mathf.Abs(z1 - z0);
@@ -30,12 +22,9 @@ static partial class GroceryStoreBuilder
         }
     }
 
-    // ---------- Settling scattered things with physics ----------
-
     static readonly List<GameObject> settleQueue = new List<GameObject>();
     static readonly HashSet<GameObject> settleForced = new HashSet<GameObject>();
 
-    // `force`: settle it even if it starts out touching something (puzzle pieces stacked together).
     static void SettleLater(GameObject go, bool force = false)
     {
         if (go == null) return;
@@ -43,10 +32,6 @@ static partial class GroceryStoreBuilder
         if (force) settleForced.Add(go);
     }
 
-    // Drops every queued item from just above where it was placed and lets physics tumble it to
-    // rest (cans roll onto their sides, boxes fall flat, nothing balances on a corner or hovers).
-    // Items that start out stuck inside something, or that roll off somewhere silly, keep their
-    // original placement.
     static void SettleProps()
     {
         var items = settleQueue.Where(g => g != null).Distinct().ToList();
@@ -63,8 +48,6 @@ static partial class GroceryStoreBuilder
         foreach (var go in items)
         {
             var b = GetBounds(go);
-            // Already wedged into a shelf, a pile or a wall? Leave it be. (Invisible seals, on the
-            // Ignore Raycast layer, don't count; they're switched off while things settle.)
             bool stuck = !settleForced.Contains(go) && Physics.OverlapBox(b.center + Vector3.up * 0.3f, b.extents * 0.8f,
                     Quaternion.identity, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
                 .Any(c => !c.transform.IsChildOf(go.transform));
@@ -120,8 +103,6 @@ static partial class GroceryStoreBuilder
         Debug.Log($"[GroceryStoreBuilder] Settled {kept} of {items.Count} scattered items with physics.");
     }
 
-    // ---------- Moving, crumbling and rolling things ----------
-
     static Rigidbody Kinematic(GameObject go)
     {
         var rb = go.AddComponent<Rigidbody>();
@@ -129,8 +110,6 @@ static partial class GroceryStoreBuilder
         return rb;
     }
 
-    // A paper plate hung from the ceiling on four strings, shuttling back and forth by `move`.
-    // Its top is at `top`.
     static Transform PaperPlate(Transform parent, Vector3 top, Vector3 move, float travel, float phase, float diameter = 6f)
     {
         var root = new GameObject("Paper Plate Platform").transform;
@@ -174,7 +153,6 @@ static partial class GroceryStoreBuilder
         return root;
     }
 
-    // A square cracker hanging on strings: it holds Henry for a moment, then snaps and drops.
     static Transform CrumbleCracker(Transform parent, Vector3 top, float size = 4.4f)
     {
         var root = new GameObject("Crumbling Cracker").transform;
@@ -196,7 +174,6 @@ static partial class GroceryStoreBuilder
         foreach (var t in root.GetComponentsInChildren<Transform>()) t.gameObject.isStatic = false;
         Kinematic(root.gameObject);
         root.gameObject.AddComponent<CrumblePlatform>();
-        // Hung from the ceiling by two strings, which stay put when it snaps off them.
         var wire = GetMaterial("Wire", new Color(0.2f, 0.2f, 0.2f));
         float h = WallHeight - top.y;
         foreach (int s in new[] { -1, 1 })
@@ -204,7 +181,6 @@ static partial class GroceryStoreBuilder
         return root;
     }
 
-    // A can lying on its side, rolling back and forth by `move`; it knocks Henry the way it's going.
     static Transform RollingCan(Transform parent, Vector3 floorAt, Vector3 move, float travel, float phase, float diameter = 2.6f)
     {
         var root = new GameObject("Rolling Can").transform;
@@ -216,7 +192,6 @@ static partial class GroceryStoreBuilder
         var c = Spawn(can, visual, 0, 1);
         var b = GetBounds(c);
         c.transform.localScale *= diameter / Mathf.Max(b.size.x, b.size.z);
-        // Lying with its axis across the direction of travel.
         var across = Vector3.Cross(Vector3.up, move.normalized);
         c.transform.rotation = Quaternion.FromToRotation(Vector3.up, across) * c.transform.rotation;
         b = GetBounds(c);

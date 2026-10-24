@@ -2,8 +2,6 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
-// The tutorial card at the bottom of the screen: icon, title, a line of help and key "chips".
-// TutorialZones call Show/Hide; it fades and slides in and out.
 public class TutorialPopup : MonoBehaviour
 {
     [SerializeField] CanvasGroup group;
@@ -40,7 +38,7 @@ public class TutorialPopup : MonoBehaviour
 
     public void Hide(Object who)
     {
-        if (who != owner) return; // a newer popup has taken over
+        if (who != owner) return;
         Play(false);
     }
 
@@ -53,7 +51,7 @@ public class TutorialPopup : MonoBehaviour
     IEnumerator Fade(bool show)
     {
         float from = group.alpha, to = show ? 1 : 0;
-        var hidden = shownPos + new Vector2(0, 40); // slides down from the top edge
+        var hidden = shownPos + new Vector2(0, 40);
         for (float t = 0; t < 0.3f; t += Time.unscaledDeltaTime)
         {
             float k = Mathf.SmoothStep(0, 1, t / 0.3f);

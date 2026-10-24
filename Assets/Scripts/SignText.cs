@@ -1,7 +1,5 @@
 using UnityEngine;
 
-// Keeps a TextMesh's depth-tested material pointed at its font's atlas. Dynamic font atlases are
-// rebuilt at runtime, so the texture can't just be saved into the material.
 [ExecuteAlways, RequireComponent(typeof(TextMesh))]
 public class SignText : MonoBehaviour
 {

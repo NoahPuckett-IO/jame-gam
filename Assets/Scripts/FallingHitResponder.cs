@@ -1,8 +1,6 @@
 using System.Collections;
 using UnityEngine;
 
-// What happens when something lands on Henry: he's knocked back with a hit animation, the screen
-// fades, and he's back at his checkpoint.
 [RequireComponent(typeof(PlayerController))]
 public class FallingHitResponder : MonoBehaviour
 {

@@ -3,10 +3,6 @@ using System.IO;
 using UnityEditor;
 using UnityEngine;
 
-// Cuts a recording of several separate sounds (a run of footsteps, a string of grunts) into one
-// short WAV per sound, so the game can pick a random one each time instead of playing the whole
-// recording. A sound is a stretch louder than `threshold` × the loudest moment; quieter gaps
-// shorter than `minGap` seconds don't split it.
 static class SoundSlicer
 {
     public static AudioClip[] Slice(string sourcePath, string outFolder, string prefix, float threshold, float minGap,
@@ -27,7 +23,6 @@ static class SoundSlicer
         var data = new float[frames * ch];
         clip.GetData(data, 0);
 
-        // Loudness envelope in 10 ms windows.
         int win = Mathf.Max(1, rate / 100);
         int windows = frames / win;
         var env = new float[windows];
@@ -62,25 +57,26 @@ static class SoundSlicer
         segments.RemoveAll(seg => (seg.y - seg.x + 1) / 100f < minLength);
 
         Directory.CreateDirectory(outFolder);
-        // Overwrite in place (keeping .meta files, so references to the clips survive a rebuild) and
-        // remove leftovers from a previous slicing that found more sounds.
         for (int k = Mathf.Min(segments.Count, maxCount); k < 64; k++)
             AssetDatabase.DeleteAsset($"{outFolder}/{prefix}_{k}.wav");
 
         var paths = new List<string>();
         for (int k = 0; k < segments.Count && k < maxCount; k++)
         {
-            int from = Mathf.Max(0, segments[k].x * win - rate / 100);     // 10 ms lead-in
-            int to = Mathf.Min(frames, (segments[k].y + 1) * win + rate / 12); // let the tail ring out
+            int from = Mathf.Max(0, segments[k].x * win - rate / 100);
+            int to = Mathf.Min(frames, (segments[k].y + 1) * win + rate / 12);
             int len = to - from;
             var samples = new float[len * ch];
+            float segPeak = 0.001f;
+            for (int i = 0; i < len * ch; i++) segPeak = Mathf.Max(segPeak, Mathf.Abs(data[from * ch + i]));
+            float gain = 0.95f / segPeak;
             int fadeIn = Mathf.Min(len / 4, rate / 400), fadeOut = Mathf.Min(len / 3, rate / 20);
             for (int i = 0; i < len; i++)
             {
                 float g = 1f;
                 if (i < fadeIn) g = i / (float)fadeIn;
                 if (i > len - fadeOut) g = Mathf.Min(g, (len - i) / (float)fadeOut);
-                for (int c = 0; c < ch; c++) samples[i * ch + c] = data[(from + i) * ch + c] * g;
+                for (int c = 0; c < ch; c++) samples[i * ch + c] = data[(from + i) * ch + c] * g * gain;
             }
             string path = $"{outFolder}/{prefix}_{k}.wav";
             WriteWav(path, samples, ch, rate);

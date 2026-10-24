@@ -1,6 +1,5 @@
 using UnityEngine;
 
-// Constant rotation about a local axis (UFO light rings and the like).
 public class Spin : MonoBehaviour
 {
     [SerializeField] Vector3 degreesPerSecond = new Vector3(0, 60, 0);

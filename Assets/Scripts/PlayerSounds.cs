@@ -1,16 +1,13 @@
 using UnityEngine;
 
-// Henry's body sounds. A footstep plays each time one of his feet comes down on the ground (read
-// from the animated foot bones, so it stays in time with the walk, jog and sprint cycles and with
-// cutscene walking), a grunt when he jumps or gets launched, and a heavier step when he lands.
 [RequireComponent(typeof(AudioSource))]
 public class PlayerSounds : MonoBehaviour
 {
     [SerializeField] Animator animator;
     [SerializeField] AudioClip[] steps;
     [SerializeField] AudioClip[] grunts;
-    [SerializeField] float stepVolume = 0.55f;
-    [SerializeField] float gruntVolume = 0.7f;
+    [SerializeField] float stepVolume = 1f;
+    [SerializeField] float gruntVolume = 0.8f;
 
     AudioSource source;
     PlayerController player;
@@ -55,7 +52,6 @@ public class PlayerSounds : MonoBehaviour
         speed = Mathf.Lerp(speed, ground, 1f - Mathf.Exp(-10f * dt));
 
         bool grounded = Grounded;
-        // Landing thump, after a real fall (isGrounded flickers for a frame on steps and slopes).
         if (grounded && !wasGrounded && player != null && airTime > 0.3f) Step(1.25f);
         airTime = grounded ? 0f : airTime + dt;
         wasGrounded = grounded;
@@ -65,8 +61,6 @@ public class PlayerSounds : MonoBehaviour
         Foot(1, rightFoot, ref floorR, grounded);
     }
 
-    // A foot is "down" once it's back within a few centimetres (at Henry's 2-unit size) of the lowest
-    // it has been lately, relative to his body; it has to lift clearly before it can land again.
     void Foot(int i, Transform foot, ref float floor, bool grounded)
     {
         float height = foot.position.y - transform.position.y;
@@ -88,7 +82,7 @@ public class PlayerSounds : MonoBehaviour
         lastStep = Time.time;
         int k = Pick(steps.Length, ref lastStepClip);
         source.pitch = Random.Range(0.92f, 1.1f);
-        float v = stepVolume * loudness * Mathf.Lerp(0.75f, 1f, Mathf.InverseLerp(4f, 22f, speed));
+        float v = stepVolume * loudness * Mathf.Lerp(0.85f, 1f, Mathf.InverseLerp(4f, 22f, speed));
         source.PlayOneShot(steps[k], v);
     }
 
@@ -101,7 +95,6 @@ public class PlayerSounds : MonoBehaviour
         source.PlayOneShot(grunts[k], gruntVolume);
     }
 
-    // A random clip, never the same one twice in a row.
     static int Pick(int count, ref int last)
     {
         int k = Random.Range(0, count);

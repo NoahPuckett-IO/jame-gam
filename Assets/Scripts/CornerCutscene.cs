@@ -2,10 +2,6 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-// Plays once when the player reaches the end of a hall: letterbox bars slide in, Henry walks
-// himself round the corner along a smooth curve through the waypoints (no sharp turns), eases to a
-// stop, and the camera tilts up at the towering next aisle before handing control back. The last
-// waypoint becomes the checkpoint.
 [RequireComponent(typeof(BoxCollider))]
 public class CornerCutscene : MonoBehaviour
 {
@@ -26,7 +22,6 @@ public class CornerCutscene : MonoBehaviour
         StartCoroutine(Play(player));
     }
 
-    // Catmull-Rom spline through the player's position and the waypoints, sampled densely.
     List<Vector3> BuildPath(Vector3 from)
     {
         var pts = new List<Vector3> { from };
@@ -56,13 +51,11 @@ public class CornerCutscene : MonoBehaviour
         while (i < path.Count)
         {
             var pos = player.transform.position;
-            // Follow a point a little way ahead on the curve so the walk itself is smooth.
             while (i < path.Count - 1 && Flat(path[i] - pos).magnitude < 2.5f) i++;
             var to = Flat(path[i] - pos);
             bool last = i == path.Count - 1;
             if (last && to.magnitude < 0.4f) break;
 
-            // Ease in at the start and ease out into the final spot.
             float target = last ? Mathf.Min(walkSpeed, to.magnitude * 2.5f) : walkSpeed;
             speed = Mathf.MoveTowards(speed, target, walkSpeed * 2f * Time.deltaTime);
             player.ScriptedMove(to.normalized * speed);
@@ -75,7 +68,6 @@ public class CornerCutscene : MonoBehaviour
         }
         player.ScriptedMove(Vector3.zero);
 
-        // Face down the new hall and slowly look up at it.
         var end = waypoints[waypoints.Length - 1];
         float hallYaw = end.eulerAngles.y;
         for (float t = 0; t < lookUpTime; t += Time.deltaTime)

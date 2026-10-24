@@ -3,14 +3,6 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
-// Builds the sets for the opening cutscene, far away from the store:
-//   - the woods at night: a dirt path through pines, rocks, stumps, mushrooms and grass (Kenney
-//     Nature Kit), a big moon and stars;
-//   - a classic comic-book flying saucer: silver disc, glass dome, spinning ring of lights, glowing
-//     underside, and a tractor-beam cone;
-//   - the spaceship interior: metal room with Kenney Space Kit corridors, consoles and machinery,
-//     an alien holding a ray gun (Kenney Blaster Kit), and a glowing pad where Henry stands.
-// Then wires everything into an IntroCutscene.
 static partial class GroceryStoreBuilder
 {
     static readonly Vector3 WoodsOrigin = new Vector3(6000, 0, 0);
@@ -23,7 +15,6 @@ static partial class GroceryStoreBuilder
         var root = new GameObject("Intro Sets").transform;
         var rng = new System.Random(11);
 
-        // ---------- Woods ----------
         var woods = new GameObject("Woods").transform;
         woods.SetParent(root);
         var o = WoodsOrigin;
@@ -37,8 +28,8 @@ static partial class GroceryStoreBuilder
         {
             float px = ((float)rng.NextDouble() - 0.5f) * 220f;
             float pz = ((float)rng.NextDouble() - 0.5f) * 220f;
-            if (Mathf.Abs(px) < 6f) px += Mathf.Sign(px == 0 ? 1 : px) * 8f; // keep the path clear
-            if (Mathf.Abs(px) < 14f && pz > -34f && pz < 14f) continue; // and the clearing where the cameras film
+            if (Mathf.Abs(px) < 6f) px += Mathf.Sign(px == 0 ? 1 : px) * 8f;
+            if (Mathf.Abs(px) < 14f && pz > -34f && pz < 14f) continue;
             var prefab = Nat(trees[rng.Next(trees.Length)]);
             if (prefab == null) continue;
             var t = Spawn(prefab, woods, rng.Next(360), 1);
@@ -59,7 +50,6 @@ static partial class GroceryStoreBuilder
             t.transform.localScale *= target * (0.7f + (float)rng.NextDouble() * 0.7f) / Mathf.Max(b.size.y, 0.01f);
             PlaceOnFloor(t, o + new Vector3(px, 0, pz));
         }
-        // Moon, moonlight and stars.
         var moon = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         moon.name = "Moon";
         moon.transform.SetParent(woods);
@@ -87,7 +77,6 @@ static partial class GroceryStoreBuilder
             Object.DestroyImmediate(s.GetComponent<Collider>());
         }
 
-        // Henry for the cutscene: the same model and animations as the player.
         var henryPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(CharacterSetup.ModelPath);
         var henry = (GameObject)PrefabUtility.InstantiatePrefab(henryPrefab, woods);
         henry.name = "Intro Henry";
@@ -106,7 +95,6 @@ static partial class GroceryStoreBuilder
         hAnim.cullingMode = AnimatorCullingMode.AlwaysAnimate;
         henry.AddComponent<HeadLook>();
         AddSounds(henry, hAnim);
-        // Soft moonlit fill that follows him, so he isn't a black shape against the trees.
         var moonFill = new GameObject("Henry Fill Light").AddComponent<Light>();
         moonFill.transform.SetParent(henry.transform, false);
         moonFill.transform.localPosition = new Vector3(0.8f, 2.6f, 2.2f) / henry.transform.localScale.y;
@@ -121,14 +109,13 @@ static partial class GroceryStoreBuilder
         var pathStop = Waypoint(woods, "Path Stop", o + new Vector3(0, 0, -2), 0);
         var hover = Waypoint(woods, "UFO Hover", o + new Vector3(0, 21, 2), 0);
         var camWalk = Waypoint(woods, "Cam Walk", pathStart.position + new Vector3(4.5f, 2.4f, -6f), 0);
-        var camLookUp = Waypoint(woods, "Cam Look Up", pathStop.position + new Vector3(5.5f, 0.8f, -3.5f), 0); // off to the side so Henry is not silhouetted against the saucer
+        var camLookUp = Waypoint(woods, "Cam Look Up", pathStop.position + new Vector3(5.5f, 0.8f, -3.5f), 0);
         camLookUp.rotation = Quaternion.LookRotation(hover.position - camLookUp.position);
         var camBeam = Waypoint(woods, "Cam Beam", pathStop.position + new Vector3(14f, 5f, -16f), 0);
         camBeam.rotation = Quaternion.LookRotation(pathStop.position + Vector3.up * 8f - camBeam.position);
 
         var ufo = BuildSaucer(woods, hover.position + Vector3.up * 60f, out var beam);
 
-        // ---------- Ship interior ----------
         var ship = new GameObject("Ship Interior").transform;
         ship.SetParent(root);
         var s0 = ShipOrigin;
@@ -173,7 +160,6 @@ static partial class GroceryStoreBuilder
         Prop("desk_chair", new Vector3(-9, 0, 8), 20, 1.6f);
         Prop("structure_detailed", new Vector3(0, 0, 13), 0, 9.5f);
 
-        // Henry's pad and the alien with its ray gun.
         var pad = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         pad.name = "Specimen Pad";
         pad.transform.SetParent(ship);
@@ -182,8 +168,6 @@ static partial class GroceryStoreBuilder
         pad.GetComponent<Renderer>().sharedMaterial = greenGlow;
         var henrySpot = Waypoint(ship, "Henry Spot", s0 + new Vector3(-3, 0.2f, 0), 90);
         Transform alien = Waypoint(ship, "Alien", s0 + new Vector3(4.5f, 0, 0), -90);
-        // A classic little green man: big bulb head, black almond eyes, antennae, silver suit. His
-        // right arm (the "Ray Gun" pivot, at the shoulder) swings up to aim at Henry's chest.
         var gunPivot = BuildAlien(alien, henrySpot.position + Vector3.up * 1.1f, out var muzzle);
         var zapGo = new GameObject("Shrink Ray");
         zapGo.transform.SetParent(ship);
@@ -209,9 +193,6 @@ static partial class GroceryStoreBuilder
             zap, flash, player, wakeInside, wakeOutside, skipHint);
     }
 
-    // The alien, built from rounded primitives in the same toy-like style as the saucer, about
-    // 3 units tall to Henry's 2. Returns the right-arm pivot (its shoulder), which the cutscene
-    // swings up from a lowered pose to aim; the retro ray gun sits in that hand.
     static Transform BuildAlien(Transform alien, Vector3 aimAt, out Transform muzzle)
     {
         var skin = GetMaterial("Alien Skin", new Color(0.36f, 0.78f, 0.3f));
@@ -267,11 +248,9 @@ static partial class GroceryStoreBuilder
             P(Y, "Antenna", alien, new Vector3(side * 0.22f, 3.0f, -0.02f), new Vector3(0.03f, 0.22f, 0.03f), new Vector3(0, 0, -side * 22f), boot);
             P(S, "Antenna Tip", alien, new Vector3(side * 0.31f, 3.22f, -0.02f), Vector3.one * 0.11f, Vector3.zero, glow);
         }
-        // Left arm hangs at his side.
         P(C, "Arm L", alien, new Vector3(-0.42f, 1.42f, 0.02f), new Vector3(0.16f, 0.32f, 0.16f), new Vector3(0, 0, -8), suit);
         P(S, "Hand L", alien, new Vector3(-0.47f, 1.08f, 0.04f), Vector3.one * 0.17f, Vector3.zero, skin);
 
-        // Right arm, straight out along the pivot's forward.
         var shoulder = new GameObject("Ray Gun").transform;
         shoulder.SetParent(alien, false);
         shoulder.localPosition = new Vector3(0.42f, 1.72f, 0);
@@ -280,7 +259,6 @@ static partial class GroceryStoreBuilder
         P(C, "Arm R", shoulder, new Vector3(0, 0, 0.3f), new Vector3(0.16f, 0.3f, 0.16f), new Vector3(90, 0, 0), suit);
         P(S, "Hand R", shoulder, new Vector3(0, -0.02f, 0.62f), Vector3.one * 0.17f, Vector3.zero, skin);
 
-        // A 1950s ray gun: chrome bulb, finned barrel, red grip and a glowing green tip.
         var gun = new GameObject("Ray Gun Model").transform;
         gun.SetParent(shoulder, false);
         gun.localPosition = new Vector3(0, 0.02f, 0.66f);
@@ -302,7 +280,6 @@ static partial class GroceryStoreBuilder
         return shoulder;
     }
 
-    // Classic 1950s-comics flying saucer.
     static Transform BuildSaucer(Transform parent, Vector3 at, out Transform beam)
     {
         var ufo = new GameObject("Flying Saucer").transform;
@@ -344,7 +321,6 @@ static partial class GroceryStoreBuilder
         glow.range = 40f;
         glow.intensity = 55f;
 
-        // Tractor beam: a translucent cone hanging from the underside to the ground.
         var beamGo = new GameObject("Tractor Beam", typeof(MeshFilter), typeof(MeshRenderer));
         beamGo.transform.SetParent(ufo, false);
         beamGo.transform.localPosition = new Vector3(0, -1.2f, 0);
@@ -352,7 +328,7 @@ static partial class GroceryStoreBuilder
         var cone = new GameObject("Cone", typeof(MeshFilter), typeof(MeshRenderer));
         cone.transform.SetParent(beam, false);
         cone.transform.localRotation = Quaternion.Euler(180, 0, 0);
-        cone.transform.localScale = new Vector3(9f, 20f, 9f); // tip up at the saucer, wide at the ground
+        cone.transform.localScale = new Vector3(9f, 20f, 9f);
         cone.transform.localPosition = new Vector3(0, -20f, 0);
         cone.transform.localRotation = Quaternion.identity;
         cone.GetComponent<MeshFilter>().sharedMesh = InvertedCone();
@@ -363,12 +339,11 @@ static partial class GroceryStoreBuilder
         beamLight.type = LightType.Point;
         beamLight.color = new Color(0.6f, 1f, 0.7f);
         beamLight.range = 24f;
-        beamLight.intensity = 50f; // brighter washed the whole beam shot out to white
+        beamLight.intensity = 50f;
         beamGo.SetActive(false);
         return ufo;
     }
 
-    // Cone with its tip at y=1 and a 0.5-radius base at y=0, double-sided so it reads from inside too.
     static Mesh InvertedCone()
     {
         const string path = "Assets/Models/BeamCone.asset";

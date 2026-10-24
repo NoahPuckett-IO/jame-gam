@@ -2,9 +2,6 @@ using System.IO;
 using UnityEditor;
 using UnityEngine;
 
-// Developer tool: renders still images of chosen spots in the built scene to JPG files (outside the
-// project), for checking a set without flying the Scene view camera around. The shots are listed
-// in Shots; each is a camera position plus a point to look at.
 static class DebugSnapshots
 {
     static readonly string OutFolder = Path.Combine(Path.GetTempPath(), "TinyHenrySnapshots");
@@ -24,6 +21,18 @@ static class DebugSnapshots
 
     static System.Collections.Generic.IEnumerable<(string, Vector3, Vector3)> Shots()
     {
+        var vac = Find("VAC-3000");
+        if (vac != null)
+        {
+            yield return ("vac", vac.position + new Vector3(7f, 5f, -9f), vac.position + Vector3.up);
+            yield return ("boss_hall", vac.position + new Vector3(0f, 22f, -60f), vac.position);
+        }
+        var portrait = Find("Portrait Camera");
+        if (portrait != null)
+        {
+            var look = portrait.position + portrait.forward * 5f;
+            yield return ("menu_henry", portrait.position, look);
+        }
         var alien = Find("Alien");
         if (alien != null)
         {
@@ -80,7 +89,7 @@ static class DebugSnapshots
     {
         var go = new GameObject("Snapshot Camera") { hideFlags = HideFlags.HideAndDontSave };
         var cam = go.AddComponent<Camera>();
-        cam.fieldOfView = 55f;
+        cam.fieldOfView = name == "menu_henry" ? 30f : 55f;
         cam.nearClipPlane = 0.1f;
         cam.farClipPlane = 3000f;
         go.transform.SetPositionAndRotation(eye, Quaternion.LookRotation(target - eye));

@@ -1,6 +1,5 @@
 using UnityEngine;
 
-// Trigger volume that shows a tutorial card while the player is inside it.
 [RequireComponent(typeof(BoxCollider))]
 public class TutorialZone : MonoBehaviour
 {
@@ -14,8 +13,6 @@ public class TutorialZone : MonoBehaviour
 
     void Start() => popup = FindAnyObjectByType<TutorialPopup>();
 
-    // Stay rather than Enter: the player starts inside the first zone while the title menu is up,
-    // so the card waits until they actually have control (and steps aside during cutscenes).
     void OnTriggerStay(Collider other)
     {
         var player = other.GetComponent<PlayerController>();

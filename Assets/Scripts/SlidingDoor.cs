@@ -1,6 +1,5 @@
 using UnityEngine;
 
-// Automatic store door: two panels slide apart along Z when the player comes close.
 public class SlidingDoor : MonoBehaviour
 {
     [SerializeField] Transform leftPanel, rightPanel;

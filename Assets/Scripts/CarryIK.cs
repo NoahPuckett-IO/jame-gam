@@ -1,8 +1,5 @@
 using UnityEngine;
 
-// Puts Henry's hands on the sides of whatever he's carrying (Animator hand IK). PlayerInteractor
-// holds the item out in front of his chest, clear of his body; this reaches both hands to its
-// left and right faces, near the back edge, so he grips it instead of his arms sinking into it.
 [RequireComponent(typeof(Animator))]
 public class CarryIK : MonoBehaviour
 {
@@ -40,7 +37,6 @@ public class CarryIK : MonoBehaviour
         Place(AvatarIKGoal.RightHand, back + item.right * (size.x / 2 + 0.03f) + item.up * up, -item.right);
     }
 
-    // Palms face the box (`inward`), fingers pointing forward.
     void Place(AvatarIKGoal goal, Vector3 position, Vector3 inward)
     {
         animator.SetIKPositionWeight(goal, weight);

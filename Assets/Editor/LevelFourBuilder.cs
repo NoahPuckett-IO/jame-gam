@@ -3,8 +3,6 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
-// Level Four: the collapsing aisle. Groceries rain down off both shelves of the fourth hallway; a
-// red dashed outline the shape of each item shows where it's about to land. Keep running and dodge.
 static partial class GroceryStoreBuilder
 {
     static void BuildLevelFour(Transform store, List<float> walkways, float aisleLength)
@@ -14,7 +12,6 @@ static partial class GroceryStoreBuilder
         float x = walkways[3], half = WalkwayWidth / 2;
         float zN = aisleLength / 2, zS = -aisleLength / 2;
 
-        // Hidden templates: every kind of product in the store, at its real size, plus cereal boxes.
         var templates = new GameObject("Falling Item Templates").transform;
         templates.SetParent(root);
         var list = new List<GameObject>();
@@ -48,23 +45,21 @@ static partial class GroceryStoreBuilder
             "The shelves are giving way! Red outlines show where things are about to land. Keep moving and dodge them.", "SHIFT", "WASD");
         CheckpointAt(root, "Checkpoint L4-A", new Vector3(x, 0, zN * 0.35f), new Vector3(WalkwayWidth, 4, 3), 180);
         CheckpointAt(root, "Checkpoint L4-B", new Vector3(x, 0, zS * 0.35f), new Vector3(WalkwayWidth, 4, 3), 180);
-        ShelfGuards(root, x, zS, zN); // no climbing the shelves to wait it out
+        ShelfGuards(root, x, zS, zN);
 
-        // Things that already fell: debris along the edges, and a toppled shelf talker sign.
         var rng = new System.Random(404);
         var debris = Measure(Stock[2].Concat(Stock[3]).ToArray());
         for (int i = 0; i < 40 && debris.Count > 0; i++)
         {
             var t = debris[rng.Next(debris.Count)];
             var p = Spawn(t.prefab, root, rng.Next(360), t.size / Mathf.Max(t.bounds.x, t.bounds.y, t.bounds.z));
-            p.transform.rotation = Quaternion.Euler(50 + rng.Next(40), rng.Next(360), rng.Next(30)) * p.transform.rotation; // physics tips it over
+            p.transform.rotation = Quaternion.Euler(50 + rng.Next(40), rng.Next(360), rng.Next(30)) * p.transform.rotation;
             float side = rng.Next(2) == 0 ? -1 : 1;
             PlaceOnFloor(p, new Vector3(x + side * (half - 1f - (float)rng.NextDouble() * 4f), 0, Mathf.Lerp(zS + 6f, zN - 6f, (float)rng.NextDouble())));
             SettleLater(p);
         }
     }
 
-    // Red dashes for the landing outlines: a repeating dash texture on an unlit transparent material.
     static Material DashMaterial()
     {
         const string texPath = MatFolder + "/Dash.png";

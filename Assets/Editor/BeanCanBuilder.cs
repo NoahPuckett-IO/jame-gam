@@ -2,9 +2,6 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
-// Generates a flat-shaded low-poly can of beans (matching the Supermarket pack's style) and saves
-// it as Assets/Models/BeanCan.prefab. Menu: JameGam > Create Bean Can; the store builder also
-// calls GetOrCreate() when it needs one.
 static class BeanCanBuilder
 {
     const string Folder = "Assets/Models";
@@ -44,17 +41,15 @@ static class BeanCanBuilder
         return prefab;
     }
 
-    // Profile from bottom to top as (radius, height, submesh). Real can ≈ 7.5 cm wide × 11 cm tall;
-    // units here are arbitrary since the store builder rescales everything.
     static readonly (float r, float y, int sub)[] Profile =
     {
-        (0.44f, 0.00f, 0), // bottom rim bevel
-        (0.50f, 0.08f, 0), // rim
-        (0.50f, 0.14f, 1), // label
-        (0.50f, 0.58f, 2), // cream stripe
-        (0.50f, 0.86f, 1), // label
-        (0.50f, 1.32f, 0), // top rim bevel
-        (0.44f, 1.40f, 0), // (top edge; its submesh is unused)
+        (0.44f, 0.00f, 0),
+        (0.50f, 0.08f, 0),
+        (0.50f, 0.14f, 1),
+        (0.50f, 0.58f, 2),
+        (0.50f, 0.86f, 1),
+        (0.50f, 1.32f, 0),
+        (0.44f, 1.40f, 0),
     };
 
     static Mesh BuildMesh()
@@ -68,7 +63,6 @@ static class BeanCanBuilder
             return new Vector3(Mathf.Cos(a) * r, y, Mathf.Sin(a) * r);
         }
 
-        // Unshared vertices per triangle give flat shading after RecalculateNormals.
         void Tri(int sub, Vector3 a, Vector3 b, Vector3 c)
         {
             subs[sub].Add(verts.Count); verts.Add(a);
@@ -76,7 +70,6 @@ static class BeanCanBuilder
             subs[sub].Add(verts.Count); verts.Add(c);
         }
 
-        // Each band takes the submesh of the profile point at its bottom.
         for (int p = 0; p < Profile.Length - 1; p++)
         {
             var lo = Profile[p];
@@ -91,7 +84,6 @@ static class BeanCanBuilder
             }
         }
 
-        // Lids
         var bottom = Profile[0];
         var top = Profile[Profile.Length - 1];
         for (int i = 0; i < Sides; i++)

@@ -1,8 +1,6 @@
 using System.Linq;
 using UnityEditor;
 
-// Makes sure JameGamGame.unity is the first scene in Build Settings.
-// Runs whenever scripts reload; does nothing once the scene is already listed.
 [InitializeOnLoad]
 static class AddGameSceneToBuild
 {

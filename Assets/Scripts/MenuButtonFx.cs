@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 
-// Menu button juice: grows slightly and nudges right while hovered or selected.
 public class MenuButtonFx : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, ISelectHandler, IDeselectHandler
 {
     [SerializeField] float hoverScale = 1.05f;

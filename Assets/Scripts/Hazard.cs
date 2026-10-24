@@ -1,8 +1,6 @@
 using System.Collections;
 using UnityEngine;
 
-// Touching this (sticky soda, freezing melt water...) sends Henry back to his last checkpoint
-// after a quick fade.
 [RequireComponent(typeof(Collider))]
 public class Hazard : MonoBehaviour
 {

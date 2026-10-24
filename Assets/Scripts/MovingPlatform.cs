@@ -1,8 +1,5 @@
 using UnityEngine;
 
-// Shuttles back and forth between its start and `offset` away (a paper plate swinging across on
-// its wires, an ice floe drifting), easing at each end and pausing there for a moment. Henry rides
-// it (PlayerController carries him along on anything with a kinematic Rigidbody).
 [DefaultExecutionOrder(-50)]
 public class MovingPlatform : MonoBehaviour
 {

@@ -4,16 +4,11 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-// Dim, cool-white fluorescent store with a few flickering lights, soft trilight ambient, light
-// haze, bloom, and a gentle depth-of-field blur on distant things so the store reads as
-// miniature-scale.
-// Called from GroceryStoreBuilder.
 static class StoreAtmosphere
 {
     const string ProfilePath = "Assets/Settings/StoreVolumeProfile.asset";
-    static readonly Color LampColor = new Color(0.92f, 0.96f, 1f); // cool fluorescent white
+    static readonly Color LampColor = new Color(0.92f, 0.96f, 1f);
 
-    // Ceiling fixtures at each (x, z), with a light hanging just below.
     public static void BuildCeilingLights(Transform parent, List<Vector2> spots, float ceilingY, float scale, Material fixtureMat)
     {
         var root = new GameObject("Ceiling Lights").transform;
@@ -36,11 +31,9 @@ static class StoreAtmosphere
             var light = lightGo.AddComponent<Light>();
             light.type = LightType.Point;
             light.color = LampColor;
-            // URP point lights fall off with distance squared, so at this store's size the
-            // intensity has to scale with the drop to the floor.
             float drop = lightGo.transform.position.y;
             light.range = drop * 2f;
-            light.intensity = 0.27f * drop * drop; // dim, after-hours feel
+            light.intensity = 0.27f * drop * drop;
             light.shadows = LightShadows.None;
 
             bool flicker = rng.NextDouble() < 0.18;
@@ -88,8 +81,8 @@ static class StoreAtmosphere
             mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
             AssetDatabase.CreateAsset(mat, path);
         }
-        mat.SetFloat("_Surface", 1); // transparent
-        mat.SetFloat("_Blend", 0);   // alpha
+        mat.SetFloat("_Surface", 1);
+        mat.SetFloat("_Blend", 0);
         mat.SetOverrideTag("RenderType", "Transparent");
         mat.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
         mat.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
@@ -114,7 +107,6 @@ static class StoreAtmosphere
         RenderSettings.fogColor = new Color(0.08f, 0.12f, 0.11f);
         RenderSettings.fogDensity = 0.0018f;
 
-        // The store has a roof now; sunlight only comes in through the door.
         var sun = GameObject.Find("Directional Light");
         if (sun != null)
         {
@@ -166,7 +158,6 @@ static class StoreAtmosphere
         bloom.intensity.Override(0.6f);
         bloom.scatter.Override(0.7f);
 
-        // Moody night-shift grade: teal-green shadows, cool highlights, crushed blacks.
         var color = Add<ColorAdjustments>(profile);
         color.postExposure.Override(0.1f);
         color.contrast.Override(18f);
@@ -183,14 +174,13 @@ static class StoreAtmosphere
 
         var wb = Add<WhiteBalance>(profile);
         wb.temperature.Override(-10f);
-        wb.tint.Override(-4f); // towards green
+        wb.tint.Override(-4f);
 
         var vignette = Add<Vignette>(profile);
         vignette.intensity.Override(0.32f);
         vignette.smoothness.Override(0.5f);
         vignette.color.Override(Color.black);
 
-        // Distant shelves go soft, like a macro lens on a tiny world.
         var dof = Add<DepthOfField>(profile);
         dof.mode.Override(DepthOfFieldMode.Gaussian);
         dof.gaussianStart.Override(4f * scale);

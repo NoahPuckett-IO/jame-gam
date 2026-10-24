@@ -4,69 +4,48 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 
-// Menu: JameGam > Build Grocery Store. Builds the whole store in the open scene: floor, walls,
-// ceiling with flickering lights, five stocked aisles of shelving, a checkout area with cash
-// registers and a sliding door full of bright daylight, the placeholder player, and the title menu.
-// Re-running replaces the previous build.
-//
-// The player stays a normal ~2 unit capsule (keeps physics and the controller sane); instead the
-// whole store is built at Scale x real size so the player is about the size of a can of beans.
-// The pack's models have inconsistent sizes, so every model is measured and scaled to a
-// real-world size here rather than trusting its import scale.
-//
-// Layout (looking from above, +Z is "up the aisles"):
-//   West wall + door | checkout area | walkway | Aisle 5 | ... | Aisle 1 | spawn walkway | East wall
 static partial class GroceryStoreBuilder
 {
     const string MatFolder = "Assets/Materials";
     const string ModelFolder = "Assets/ThirdParty/Supermarket";
     const string KenneyFolder = "Assets/ThirdParty/Kenney";
     const string FoodKitFolder = "Assets/ThirdParty/KenneyFood";
-    const string ShelfModel = "shelfMarker"; // also try shelfMarker2/3/4
+    const string ShelfModel = "shelfMarker";
 
-    // A ~11 cm can scaled to a 2 m player ≈ 18x. Real-world sizes below are in meters.
     const float Scale = 18f;
 
     const float ShelfHeight = 1.8f * Scale;
     const float TargetAisleLength = 12f * Scale;
     const float WalkwayWidth = 2.2f * Scale;
-    const float EndZone = 2.4f * Scale;          // floor between aisle ends and the north/south walls (coolers take 0.85 m)
-    const float CheckoutWidth = 11f * Scale;     // extra room on the west side for the registers
-    const float WallHeight = 4.5f * Scale;       // also the ceiling height
+    const float EndZone = 2.4f * Scale;
+    const float CheckoutWidth = 11f * Scale;
+    const float WallHeight = 4.5f * Scale;
     const float DoorWidth = 3.2f * Scale;
     const float DoorHeight = 2.6f * Scale;
     const int AisleCount = 5;
 
-    // Stock per aisle (Aisle 1 is next to the spawn). Model name and its real-world longest
-    // dimension in meters. "k:" models come from Kenney's Food Kit, the rest from the Supermarket
-    // pack. Each shelf level of each section gets one product, cycling through the list.
     static readonly (string model, float size)[][] Stock =
     {
-        // Bread & bakery
         new[] { ("Bread", 0.28f), ("k:loaf", 0.28f), ("k:croissant", 0.14f), ("k:loaf-baguette", 0.6f), ("k:muffin", 0.08f),
                 ("Bread", 0.28f), ("k:loaf-round", 0.22f), ("k:donut-sprinkles", 0.1f), ("k:peanut-butter", 0.12f),
                 ("k:cookie-chocolate", 0.08f), ("k:honey", 0.12f), ("Pasta", 0.22f), ("k:donut", 0.1f), ("coffee", 0.18f) },
-        // Canned goods & condiments
         new[] { ("BeanCan", 0.11f), ("k:can", 0.12f), ("k:bottle-ketchup", 0.2f), ("k:can-small", 0.09f), ("BeanCan", 0.11f),
                 ("k:bottle-musterd", 0.18f), ("k:bottle-oil", 0.3f), ("Pasta", 0.22f), ("k:soy", 0.18f),
                 ("k:shaker-salt", 0.1f), ("k:shaker-pepper", 0.1f) },
-        // Dairy & drinks
         new[] { ("Milk", 0.25f), ("k:carton", 0.25f), ("Juice", 0.25f), ("Eggs", 0.3f), ("k:cheese", 0.15f), ("k:soda-bottle", 0.3f),
                 ("cheese", 0.15f), ("k:carton-small", 0.15f), ("k:soda-can", 0.12f), ("k:wine-red", 0.3f), ("k:wine-white", 0.3f) },
-        // Produce
         new[] { ("Apple", 0.09f), ("k:orange", 0.08f), ("banana", 0.2f), ("k:carrot", 0.2f), ("k:broccoli", 0.15f), ("grapes", 0.15f),
                 ("k:pineapple", 0.3f), ("lettuce", 0.2f), ("k:lemon", 0.07f), ("k:corn", 0.2f), ("tomate", 0.09f), ("k:cabbage", 0.2f),
                 ("k:pear", 0.1f), ("k:eggplant", 0.2f), ("k:watermelon", 0.35f), ("k:onion", 0.08f), ("k:paprika", 0.1f), ("k:mushroom", 0.06f) },
-        // Meat, frozen & snacks
         new[] { ("meat", 0.25f), ("k:meat-ribs", 0.3f), ("ChickenLeg", 0.15f), ("k:whole-ham", 0.25f), ("fish", 0.3f), ("k:bacon-raw", 0.25f),
                 ("k:sausage", 0.2f), ("k:turkey", 0.35f), ("IceCream", 0.15f), ("k:pizza-box", 0.35f), ("k:ice-cream", 0.15f),
                 ("k:candy-bar", 0.15f), ("k:chocolate", 0.15f), ("k:cake", 0.25f), ("k:pie", 0.25f), ("Soap", 0.2f), ("toaster", 0.3f) },
     };
 
-    [MenuItem("JameGam/Build Grocery Store %#&b")] // Ctrl+Shift+Alt+B
+    [MenuItem("JameGam/Build Grocery Store %#&b")]
     static void Build()
     {
-        MakeModelsReadable(); // the builder reads meshes to find shelf boards and true bounds
+        MakeModelsReadable();
         var shelfPrefab = LoadModel(ShelfModel);
         if (shelfPrefab == null)
         {
@@ -91,13 +70,11 @@ static partial class GroceryStoreBuilder
         var store = new GameObject("Store");
         Undo.RegisterCreatedObjectUndo(store, "Build Grocery Store");
 
-        // A one-sided run of shelving lines the east wall (half of a gondola, the rest is in the wall),
-        // so the first hallway has shelves on both sides. It gets its own strip of floor.
         float wallShelfOut = shelf.doubleSided ? shelf.depth / 2 : shelf.depth;
         float width = CheckoutWidth + AisleCount * shelf.gondolaDepth + (AisleCount + 1) * WalkwayWidth + wallShelfOut;
         float depth = aisleLength + 2 * EndZone;
         float left = -width / 2, right = width / 2;
-        float aislesRight = right - wallShelfOut; // east edge of the first hallway
+        float aislesRight = right - wallShelfOut;
         float wallT = 0.2f * Scale;
 
         Box("Floor", store.transform, new Vector3(0, -0.5f, 0), new Vector3(width, 1, depth), FloorTiles(width, depth));
@@ -118,24 +95,21 @@ static partial class GroceryStoreBuilder
         var wallShelf = BuildAisle(0, store.transform, shelf.doubleSided ? right : right - shelf.depth / 2, units, aisleLength, shelfPrefab, shelf);
         wallShelf.name = "Wall Shelf";
 
-        // Walkway centers, east to west: 0 is the first hallway (Level One), 1 the shelf climb,
-        // 2 the freezer aisle, 3 the falling aisle.
         var walkways = new List<float>();
         for (int w = 0; w <= AisleCount; w++)
             walkways.Add(aislesRight - WalkwayWidth / 2 - w * (shelf.gondolaDepth + WalkwayWidth));
-        PlanLevelTwo(aisles, walkways, shelf); // reserves the shelf boards Level Two walks on
+        PlanLevelTwo(aisles, walkways, shelf);
 
         TalkerColors = new[]
         {
             GetMaterial("Talker Red", new Color(0.9f, 0.12f, 0.1f)), GetMaterial("Talker Yellow", new Color(1f, 0.8f, 0.1f)),
             GetMaterial("Talker Green", new Color(0.15f, 0.7f, 0.3f)), GetMaterial("Talker Orange", new Color(1f, 0.45f, 0.05f)),
         };
-        // Aisles 2 and 3 have freezers along their freezer-aisle halves, so no boxes on top.
         PlaceBoxes(store.transform, aisles.Where((a, i) => i != 1 && i != 2).ToList(), shelf, aisleLength);
         BuildBlockades(store.transform, aisles, shelf, aisleLength, depth);
         for (int i = 0; i < aisles.Count && i < Stock.Length; i++)
             StockAisle(aisles[i], shelf, aisleLength, Stock[i], sides: i == 1 ? new[] { 1 } : i == 2 ? new[] { -1 } : null);
-        StockAisle(wallShelf, shelf, aisleLength, Stock[1], sides: new[] { -1 }); // only the side facing the hallway
+        StockAisle(wallShelf, shelf, aisleLength, Stock[1], sides: new[] { -1 });
 
         BuildEndcaps(store.transform, aisles, shelf, aisleLength);
         BuildCheckout(store.transform, left, depth);
@@ -147,11 +121,9 @@ static partial class GroceryStoreBuilder
         BacklitSign(store.transform, new Vector3(right - 0.05f * Scale, WallHeight - 0.9f * Scale, 0), Vector3.left,
             7f * Scale, 1.0f * Scale, "FRESH MARKET", new Color(0.15f, 0.55f, 0.25f),
             subtitle: "OPEN 24 HOURS  •  " + MenuBuilder.GameTitle.ToUpper(), iconLeft: "store", iconRight: "cart");
-        // Aisle 2's sign hangs by one wire; Aisle 4's has come down and lies on the floor.
         for (int i = 0; i < aisles.Count; i++)
             HangAisleSign(store.transform, aisles[i].position.x, -aisleLength / 2, i + 1, AisleNames[i], damage: i == 1 ? 1 : i == 3 ? 2 : 0);
 
-        // Lights down every walkway and over the checkout area.
         var spots = new List<Vector2>();
         float lightStep = 3f * Scale;
         int rows = Mathf.Max(1, Mathf.RoundToInt(depth / lightStep));
@@ -166,7 +138,6 @@ static partial class GroceryStoreBuilder
         StoreAtmosphere.BuildCeilingLights(store.transform, spots, WallHeight, Scale, StoreAtmosphere.FixtureMaterial());
         StoreAtmosphere.ApplySceneLook(Scale);
 
-        // Where Play drops the player: the near end of the rightmost walkway, facing up the aisle.
         var spawn = new GameObject("Spawn Point").transform;
         spawn.SetParent(store.transform);
         spawn.position = new Vector3(aislesRight - WalkwayWidth / 2, 1, -aisleLength / 2 - 0.5f * Scale);
@@ -187,11 +158,10 @@ static partial class GroceryStoreBuilder
         BuildLevelTwo(store.transform, aisleLength);
         BuildLevelThree(store.transform, aisles, walkways, shelf, aisleLength);
         BuildLevelFour(store.transform, walkways, aisleLength);
+        BuildBoss(store.transform, walkways, aisleLength, depth, shelfPrefab, shelf);
         BuildIntro(store.transform, controller, wakeInside, wakeOutside);
         spawn.SetPositionAndRotation(wakeOutside.position, wakeOutside.rotation);
 
-        // Number keys 1–4: developer warps to the start of each level; 5 and up: to spots partway
-        // through, which the level builders register in devWarps.
         var warps = new GameObject("Level Warps").transform;
         warps.SetParent(store.transform);
         var warpList = new List<Transform>
@@ -206,7 +176,6 @@ static partial class GroceryStoreBuilder
         warps.gameObject.AddComponent<LevelWarp>().Setup(warpList.ToArray());
         player.transform.position = wakeInside.position;
 
-        // Menu backdrop: the camera starts low behind the spawn, looking up the first towering hall.
         if (Camera.main != null)
         {
             Undo.RecordObject(Camera.main.transform, "Build Grocery Store");
@@ -220,7 +189,6 @@ static partial class GroceryStoreBuilder
         MenuBuilder.Build(controller, spawn);
         BuildMusic();
 
-        // The store is a few hundred units across; make sure the far end is not clipped.
         if (Camera.main != null)
         {
             Undo.RecordObject(Camera.main, "Build Grocery Store");
@@ -231,8 +199,6 @@ static partial class GroceryStoreBuilder
         Selection.activeGameObject = player;
     }
 
-    // The soundtrack: one looping track (Assets/Audio/Ezrasong4game.wav), streamed and compressed
-    // so the 50 MB WAV doesn't sit in memory. GameMusic pauses it for menus and cutscenes.
     static void BuildMusic()
     {
         const string path = "Assets/Audio/Ezrasong4game.wav";
@@ -262,11 +228,8 @@ static partial class GroceryStoreBuilder
         Undo.RegisterCreatedObjectUndo(go, "Build Grocery Store");
     }
 
-    // Extra developer warp spots (keys 5 and up), added by the level builders.
     static readonly List<(string, Vector3, float)> devWarps = new List<(string, Vector3, float)>();
 
-    // Footsteps and jump grunts (both from the Freesound community, Pixabay licence), cut into
-    // single sounds so each step or jump plays a random one.
     public static void AddSounds(GameObject body, Animator animator)
     {
         var stepClips = SoundSlicer.Slice("Assets/Audio/Footsteps.mp3", "Assets/Audio/Steps", "Step", 0.15f, 0.05f, 0.03f, 6);
@@ -276,10 +239,6 @@ static partial class GroceryStoreBuilder
         body.AddComponent<PlayerSounds>().Setup(animator, stepClips, gruntClips);
     }
 
-    // Swaps the placeholder capsule's looks for Henry (Kenney Animated Characters + Quaternius'
-    // Universal Animation Library, both CC0), sized to the 2-unit CharacterController with his
-    // feet on its bottom, and wires up his animations. A soft fill light rides along so he stays
-    // readable in the dark aisles.
     static GameObject AddHenry(GameObject player, PlayerController controller)
     {
         CharacterSetup.EnsureImport();
@@ -319,7 +278,6 @@ static partial class GroceryStoreBuilder
         fill.range = 9f;
         fill.intensity = 9f;
         fill.shadows = LightShadows.None;
-        // A softer key from in front and above so his face and clothes read in the shadows.
         var key = new GameObject("Henry Key Light").AddComponent<Light>();
         key.transform.SetParent(player.transform, false);
         key.transform.localPosition = new Vector3(-0.6f, 2.6f, 2.4f);
@@ -335,7 +293,6 @@ static partial class GroceryStoreBuilder
         return model;
     }
 
-    // West wall with a big doorway in the middle, sliding glass doors, and bright daylight outside.
     static void BuildWestWallAndDoor(Transform store, float wallX, float wallT, float depth, Material wallMat)
     {
         float sideLen = (depth - DoorWidth) / 2;
@@ -371,7 +328,6 @@ static partial class GroceryStoreBuilder
         var rightPanel = MakePanel("Panel North", DoorWidth / 4);
         door.gameObject.AddComponent<SlidingDoor>().Setup(leftPanel, rightPanel, DoorWidth / 2, 3f * Scale);
 
-        // Outside: a sidewalk, a glowing "daylight" backdrop for bloom, and a sun spot shining in.
         var outside = new GameObject("Outside").transform;
         outside.SetParent(store);
         Box("Sidewalk", outside, new Vector3(wallX - 2f * Scale, -0.5f, 0), new Vector3(4f * Scale, 1, DoorWidth * 3), GetMaterial("Sidewalk", new Color(0.85f, 0.85f, 0.85f)));
@@ -383,7 +339,7 @@ static partial class GroceryStoreBuilder
         var sunGo = new GameObject("Door Sunlight");
         sunGo.transform.SetParent(outside);
         sunGo.transform.position = new Vector3(wallX - 3f * Scale, DoorHeight * 1.1f, 0);
-        sunGo.transform.rotation = Quaternion.Euler(22f, 90f, 0f); // into the store, angled down
+        sunGo.transform.rotation = Quaternion.Euler(22f, 90f, 0f);
         var sun = sunGo.AddComponent<Light>();
         sun.type = LightType.Spot;
         sun.color = new Color(1f, 0.97f, 0.92f);
@@ -394,17 +350,12 @@ static partial class GroceryStoreBuilder
         sun.shadows = LightShadows.Soft;
     }
 
-    // Store front, laid out like a real one: checkout lanes running east-west between the aisles
-    // and the door (so you walk through a lane to leave), a nested row of carts by the door,
-    // and freezers against the north wall.
     static void BuildCheckout(Transform store, float left, float depth)
     {
         var area = new GameObject("Checkout").transform;
         area.SetParent(store);
         float laneX = left + CheckoutWidth * 0.58f;
 
-        // Counters: 2.5 m tall (well over the 1.05 m carts), at most 6 m long, each standing on a
-        // black rubber mat. Lanes between them; the middle lane lines up with the door.
         var cashier = LoadModel("cashier");
         var rubber = GetMaterial("RubberMat", new Color(0.05f, 0.05f, 0.055f));
         rubber.SetFloat("_Smoothness", 0.05f);
@@ -420,7 +371,6 @@ static partial class GroceryStoreBuilder
                 checkoutCounters.Add(counter);
             }
 
-        // Chest freezers are ~0.9 m tall, upright ones ~2 m.
         var freezers = new[] { LoadModel("Frezer"), LoadModel("Frezer2") }.Where(f => f != null).ToArray();
         for (int i = 0; i < freezers.Length; i++)
         {
@@ -433,18 +383,16 @@ static partial class GroceryStoreBuilder
             f.transform.position += Vector3.forward * (depth / 2 - 0.1f * Scale - b.max.z);
         }
 
-        // Cart corral: three rows of carts nested nose-to-tail along the west wall, south of the door,
-        // plus a few strays left around the store front.
         var cart = LoadModel("ShopingCar");
         if (cart != null)
         {
-            for (int row = 0; row < 2; row++) // two long rows, clear of the drinks racks at the lane ends
+            for (int row = 0; row < 2; row++)
             {
                 float z = -DoorWidth / 2 - 0.6f * Scale;
                 for (int i = 0; i < 11; i++)
                 {
                     PlaceProp(cart, area, 1.05f, 1.1f, alongX: false, new Vector3(left + (0.45f + row * 0.65f) * Scale, 0, z));
-                    z -= 0.38f * Scale; // nested carts overlap most of their length
+                    z -= 0.38f * Scale;
                 }
             }
             var strayRng = new System.Random(4);
@@ -457,8 +405,6 @@ static partial class GroceryStoreBuilder
         }
     }
 
-    // Spawns a model `realHeight` meters tall (scaled), shrunk further if its footprint is longer than
-    // `maxLength`, with its long side along X or Z, standing on the floor at `at`.
     static GameObject PlaceProp(GameObject prefab, Transform parent, float realHeight, float maxLength, bool alongX, Vector3 at)
     {
         var go = Spawn(prefab, parent, 0, 1);
@@ -479,8 +425,6 @@ static partial class GroceryStoreBuilder
 
     static readonly string[] AisleNames = { "BAKERY", "CANNED GOODS", "DAIRY & DRINKS", "PRODUCE", "MEAT & FROZEN" };
 
-    // Classic supermarket vinyl tile: off-white and pale grey checker with speckles and grout lines.
-    // Generated once as a PNG so it can be tweaked in any image editor.
     static Material FloorTiles(float width, float depth)
     {
         const string texPath = MatFolder + "/FloorTiles.png";
@@ -500,7 +444,7 @@ static partial class GroceryStoreBuilder
                 if (speck > 0.97f) c *= 0.8f;
                 else if (speck < 0.02f) c = Color.Lerp(c, Color.white, 0.5f);
                 c *= 0.97f + 0.03f * (float)rng.NextDouble();
-                if (x % half < 2 || y % half < 2) c *= 0.7f; // grout
+                if (x % half < 2 || y % half < 2) c *= 0.7f;
                 tex.SetPixel(x, y, c);
             }
             System.IO.File.WriteAllBytes(texPath, tex.EncodeToPNG());
@@ -512,26 +456,22 @@ static partial class GroceryStoreBuilder
         var map = AssetDatabase.LoadAssetAtPath<Texture2D>(texPath);
         mat.SetTexture("_BaseMap", map);
         mat.color = Color.white;
-        float tile = 0.3f * Scale; // 30 cm tiles; the texture holds 2×2
+        float tile = 0.3f * Scale;
         mat.SetTextureScale("_BaseMap", new Vector2(width / (2 * tile), depth / (2 * tile)));
         mat.SetFloat("_Smoothness", 0.55f);
         EditorUtility.SetDirty(mat);
         return mat;
     }
 
-    // Hanging sign over the near end of an aisle, readable from both sides.
-    // damage: 0 = hanging normally, 1 = one wire snapped so it dangles at an angle,
-    // 2 = both wires gone and the sign lies on the floor.
     static void HangAisleSign(Transform store, float x, float z, int number, string label, int damage = 0)
     {
         var sign = new GameObject($"Aisle Sign {number}").transform;
         sign.SetParent(store);
         sign.position = new Vector3(x, WallHeight - 1.1f * Scale, z);
 
-        // Two-sided lightbox: big aisle number in a white circle on the left, the aisle name, and an icon.
         BacklitSign(sign, sign.position, Vector3.back, 1.7f * Scale, 0.6f * Scale, label, new Color(0.12f, 0.35f, 0.62f),
             twoSided: true, subtitle: AisleSubtitles[number - 1], iconRight: AisleIcons[number - 1],
-            iconLeft: ""); // empty icon = keep the left slot clear for the number disc below
+            iconLeft: "");
         var disc = GetMaterial("SignDisc", Color.white);
         foreach (var n in new[] { Vector3.back, Vector3.forward })
         {
@@ -562,16 +502,14 @@ static partial class GroceryStoreBuilder
         }
         else if (damage == 1)
         {
-            // Right wire snapped: the sign swings down from its left wire, with the broken stub left hanging.
             var hook = top + Vector3.left * 0.6f * Scale;
-            sign.RotateAround(hook, Vector3.forward, -38f); // right end drops
+            sign.RotateAround(hook, Vector3.forward, -38f);
             Wire(hook);
             Box("Snapped Wire", store, top + Vector3.right * 0.6f * Scale + Vector3.up * wireLen * 0.8f,
                 new Vector3(0.01f * Scale, wireLen * 0.4f, 0.01f * Scale), wireMat);
         }
         else
         {
-            // Fallen: lying almost flat on the floor a little way out from the aisle end, slightly twisted.
             sign.rotation = Quaternion.Euler(80f, 14f, 0f);
             var b = GetBounds(sign.gameObject);
             sign.position += new Vector3(0.4f * Scale - (b.center.x - x), -b.min.y, -0.9f * Scale - (b.center.z - z));
@@ -585,8 +523,6 @@ static partial class GroceryStoreBuilder
     static readonly string[] AisleSubtitles = { "BREAD • PASTRY • BREAKFAST", "SOUP • BEANS • SAUCES", "MILK • EGGS • SODA", "FRUIT • VEGETABLES", "MEAT • FISH • SNACKS" };
     static readonly string[] AisleIcons = { "bakery", "soup", "drink", "apple", "fish" };
 
-    // Moves the spawn to the checkout side of the store, facing the lanes, to look at it quickly.
-    // Rebuilding the store puts the spawn back.
     [MenuItem("JameGam/Debug/Spawn At Checkout")]
     static void SpawnAtCheckout()
     {
@@ -625,14 +561,12 @@ static partial class GroceryStoreBuilder
         Object.DestroyImmediate(go);
     }
 
-    // Wraps a model in an unrotated holder scaled so the model fills `size` exactly (world axes).
     static Transform FitInto(GameObject prefab, Transform parent, Vector3 size)
     {
         var holder = new GameObject(prefab.name).transform;
         holder.SetParent(parent, false);
         var probe = Spawn(prefab, holder, 0, 1);
         var b = GetBounds(probe);
-        // Match the model's thin side to the target's thin side.
         bool modelThinX = b.size.x < b.size.z, targetThinX = size.x < size.z;
         if (modelThinX != targetThinX)
         {
@@ -648,18 +582,15 @@ static partial class GroceryStoreBuilder
 
     struct ShelfInfo
     {
-        public float yaw;          // rotation that lines the shelf's long side up with world Z
-        public float scale;        // uniform scale applied on top of the prefab's own scale
+        public float yaw;
+        public float scale;
         public float length, depth;
-        public bool frontIsPlusX;  // which side the shelves open towards at `yaw`
-        public bool doubleSided;   // open on both sides: one unit per gondola instead of two back to back
+        public bool frontIsPlusX;
+        public bool doubleSided;
         public float gondolaDepth;
         public float SideDepth => doubleSided ? depth / 2 : depth;
     }
 
-    // Works out how the shelf model is oriented and sized, and which side is its open front,
-    // from a temporary copy's mesh: the closed back shows a lot of surface facing out, the open
-    // front only thin board edges.
     static ShelfInfo MeasureShelf(GameObject prefab)
     {
         var info = new ShelfInfo();
@@ -680,7 +611,7 @@ static partial class GroceryStoreBuilder
         float plus = 0, minus = 0;
         foreach (var (p0, p1, p2) in WorldTriangles(probe))
         {
-            var n = Vector3.Cross(p1 - p0, p2 - p0); // length = 2 × area
+            var n = Vector3.Cross(p1 - p0, p2 - p0);
             if (n.x > 0) plus += n.x; else minus -= n.x;
         }
         info.frontIsPlusX = plus <= minus;
@@ -709,13 +640,11 @@ static partial class GroceryStoreBuilder
             .Where(t => Vector3.Cross(t.Item2 - t.Item1, t.Item3 - t.Item1).normalized.y > 0.7f)
             .ToList();
 
-    // Heights of every upward-facing surface of `tris` directly above/below (x, z), lowest first.
     static List<float> SurfacesAt(List<(Vector3 a, Vector3 b, Vector3 c)> tris, float x, float z)
     {
         var heights = new List<float>();
         foreach (var (a, b, c) in tris)
         {
-            // Barycentric test in the XZ plane, then interpolate Y.
             float d = (b.z - c.z) * (a.x - c.x) + (c.x - b.x) * (a.z - c.z);
             if (Mathf.Abs(d) < 1e-6f) continue;
             float w1 = ((b.z - c.z) * (x - c.x) + (c.x - b.x) * (z - c.z)) / d;
@@ -748,7 +677,6 @@ static partial class GroceryStoreBuilder
         aisle.SetParent(parent);
         aisle.position = new Vector3(x, 0, 0);
 
-        // Each side faces outwards into its walkway: +1 = facing +X, -1 = facing -X.
         var sides = shelf.doubleSided ? new[] { 1 } : new[] { 1, -1 };
         foreach (int side in sides)
         {
@@ -769,9 +697,9 @@ static partial class GroceryStoreBuilder
     class ProductType
     {
         public GameObject prefab;
-        public float size;     // longest side, scaled world units
-        public float yaw;      // lines the product's long side up with the shelf (Z)
-        public Vector3 bounds; // size at scale 1 after `yaw`
+        public float size;
+        public float yaw;
+        public Vector3 bounds;
     }
 
     static ProductType MeasureProduct(GameObject prefab, float realSize)
@@ -786,9 +714,6 @@ static partial class GroceryStoreBuilder
         return new ProductType { prefab = prefab, size = realSize * Scale, yaw = yaw, bounds = size };
     }
 
-    // Finds every upward-facing shelf surface in the aisle's meshes, then lines products up along
-    // each one (except the top of the unit), front edges flush with the shelf front. Each product
-    // is shrunk if needed to fit the gap above it and the shelf's depth.
     static void StockAisle(Transform aisle, ShelfInfo shelf, float aisleLength, (string model, float size)[] stock, int[] sides = null)
     {
         var upTris = UpwardTriangles(aisle.gameObject);
@@ -811,7 +736,7 @@ static partial class GroceryStoreBuilder
 
         float x0 = aisle.position.x;
         float gap = 0.012f * Scale;
-        float edge = x0; // outer face of the gondola on the current side
+        float edge = x0;
         var rng = new System.Random(aisle.GetSiblingIndex() * 31 + 5);
         float Rand(float a, float b) => a + (float)rng.NextDouble() * (b - a);
         var railMat = GetMaterial("PriceRail", new Color(0.92f, 0.92f, 0.9f));
@@ -820,7 +745,6 @@ static partial class GroceryStoreBuilder
         foreach (int side in sides ?? new[] { 1, -1 })
         {
             edge = x0 + side * shelf.gondolaDepth / 2;
-            // Probe well inside the boards (they don't reach the gondola's middle core).
             float xProbe = x0 + side * shelf.gondolaDepth * 0.35f;
             int sections = Mathf.RoundToInt(aisleLength / shelf.length);
             for (int section = 0; section < sections; section++)
@@ -828,7 +752,6 @@ static partial class GroceryStoreBuilder
                 float start = -aisleLength / 2 + section * shelf.length;
                 float zc = start + shelf.length / 2;
                 var levels = SurfacesAt(upTris, xProbe, zc);
-                // The highest board has nothing above it out here; the unit's height caps it.
                 if (levels.Count > 0 && levels[levels.Count - 1] < ShelfHeight * 0.95f) levels.Add(ShelfHeight);
 
                 for (int i = 0; i < levels.Count - 1; i++)
@@ -837,8 +760,6 @@ static partial class GroceryStoreBuilder
                     float room = levels[i + 1] - y;
                     if (room < 0.05f * Scale) continue;
 
-                    // Measure how far this board actually reaches: first and last spot from the
-                    // outer edge inwards that has a surface at this height.
                     float front = float.NaN, back = float.NaN;
                     for (float f = 0.005f; f < 0.5f; f += 0.01f)
                     {
@@ -852,7 +773,6 @@ static partial class GroceryStoreBuilder
                     float boardDepth = Mathf.Abs(back - front);
                     if (boardDepth < 0.05f * Scale) continue;
 
-                    // Price rail along the board's front edge, with a tag now and then.
                     Box("Price Rail", products, new Vector3(front + side * 0.004f * Scale, y - 0.015f * Scale, zc),
                         new Vector3(0.008f * Scale, 0.035f * Scale, shelf.length * 0.98f), railMat);
 
@@ -862,9 +782,6 @@ static partial class GroceryStoreBuilder
         }
     }
 
-    // Fills one board the way a real store looks: runs ("facings") of the same product side by
-    // side, one to three rows deep, slightly crooked, with the odd gap where something sold out
-    // and the occasional item knocked over.
     static void StockBoard(Transform parent, List<ProductType> types, System.Random rng, System.Func<float, float, float> rand,
         int side, float y, float room, float front, float boardDepth, float start, float length, float gap,
         List<(Vector3, Vector3, Vector3)> upTris, Material tagMat)
@@ -882,7 +799,6 @@ static partial class GroceryStoreBuilder
 
             if (z + w > end) break;
 
-            // Price tag under the start of each run.
             var tag = GameObject.CreatePrimitive(PrimitiveType.Cube);
             tag.name = "Price Tag";
             tag.transform.SetParent(parent);
@@ -891,7 +807,6 @@ static partial class GroceryStoreBuilder
             tag.GetComponent<Renderer>().sharedMaterial = tagMat;
             Object.DestroyImmediate(tag.GetComponent<Collider>());
 
-            // Now and then a bright "shelf talker" card sticks out into the aisle.
             if (rng.NextDouble() < 0.14)
             {
                 var talker = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -909,12 +824,11 @@ static partial class GroceryStoreBuilder
                 bool sold = rng.NextDouble() < 0.03;
                 for (int r = 0; r < rows && !sold; r++)
                 {
-                    // Mostly full, with the odd item already taken.
                     if (r > 0 && rng.NextDouble() < 0.06) continue;
                     if (r == 0 && rng.NextDouble() < 0.02) continue;
 
                     float px = front - side * (d / 2 + r * (d + gap) + rand(0f, gap));
-                    if (InNoStockZone(new Vector3(px, y + 1f, zc))) continue; // a board the level route walks on
+                    if (InNoStockZone(new Vector3(px, y + 1f, zc))) continue;
                     if (!HasSurface(upTris, px, zc - w * 0.4f, y) || !HasSurface(upTris, px, zc + w * 0.4f, y)) continue;
 
                     var p = Spawn(type.prefab, parent, type.yaw + (side > 0 ? 0 : 180), s * rand(0.93f, 1f));
@@ -929,9 +843,6 @@ static partial class GroceryStoreBuilder
         }
     }
 
-    // Overstock cardboard boxes on top of every shelf section, plus a small stack on the floor at
-    // the front end of each aisle. Kept under their own root (not the aisle) so StockAisle
-    // doesn't mistake box lids for shelf surfaces.
     static void PlaceBoxes(Transform store, List<Transform> aisles, ShelfInfo shelf, float aisleLength)
     {
         var closed = LoadKenney("cardboardBoxClosed");
@@ -951,7 +862,7 @@ static partial class GroceryStoreBuilder
 
             for (int u = 0; u < units; u++)
             {
-                if (rng.NextDouble() < 0.35) continue; // leave some gaps
+                if (rng.NextDouble() < 0.35) continue;
                 float z = -aisleLength / 2 + (u + 0.5f) * shelf.length;
                 var tops = SurfacesAt(upTris, x, z);
                 float top = tops.Count > 0 ? tops[tops.Count - 1] : ShelfHeight;
@@ -962,9 +873,6 @@ static partial class GroceryStoreBuilder
         }
     }
 
-    // Piles of boxes with groceries spilling out, closing off one end of every aisle: south end of
-    // Aisles 1, 3, 5 and north end of 2, 4. From the spawn the only way to the checkout is an S:
-    // up walkway 0, round the north end of Aisle 1, down walkway 1, round the south end of Aisle 2...
     static void BuildBlockades(Transform store, List<Transform> aisles, ShelfInfo shelf, float aisleLength, float depth)
     {
         var closed = LoadKenney("cardboardBoxClosed");
@@ -981,20 +889,18 @@ static partial class GroceryStoreBuilder
         {
             bool south = i % 2 == 0;
             float ax = aisles[i].position.x;
-            float zNear = south ? -aisleLength / 2 : aisleLength / 2; // aisle end
-            float zWall = (south ? -1 : 1) * (depth / 2 - CoolerDepth); // up to the coolers' glass
+            float zNear = south ? -aisleLength / 2 : aisleLength / 2;
+            float zWall = (south ? -1 : 1) * (depth / 2 - CoolerDepth);
             float zMid = (zNear + zWall) / 2;
             float spanZ = Mathf.Abs(zWall - zNear);
             var pile = new GameObject($"Blockade {i + 1}").transform;
             pile.SetParent(root);
 
-            // Invisible wall so the gap is truly closed, even if the player jumps onto the pile.
             var blocker = new GameObject("Blocker").AddComponent<BoxCollider>();
             blocker.transform.SetParent(pile);
             blocker.transform.position = new Vector3(ax, WallHeight / 2, zMid);
             blocker.size = new Vector3(shelf.gondolaDepth, WallHeight, spanZ);
 
-            // Stacks of boxes on a grid, uneven heights, a bit askew.
             int nx = Mathf.CeilToInt(shelf.gondolaDepth / box), nz = Mathf.CeilToInt(spanZ / box);
             var openTops = new List<Bounds>();
             for (int gx = 0; gx < nx; gx++)
@@ -1014,7 +920,6 @@ static partial class GroceryStoreBuilder
                     y = bb.max.y;
                     if (isOpen) openTops.Add(bb);
                 }
-                // A box that slid off the top and landed on its side next to the stack.
                 if (rng.NextDouble() < 0.15)
                 {
                     var fallen = SpawnSized(closed, pile, box * 0.9f, Rand(0f, 360f));
@@ -1025,7 +930,6 @@ static partial class GroceryStoreBuilder
                 }
             }
 
-            // Groceries from this aisle: poking out of the open boxes and scattered on the floor.
             var stock = Stock[Mathf.Min(i, Stock.Length - 1)];
             var types = stock.Select(s => (prefab: LoadModel(s.model), s.size)).Where(t => t.prefab != null)
                 .Select(t => MeasureProduct(t.prefab, t.size)).ToList();
@@ -1039,7 +943,7 @@ static partial class GroceryStoreBuilder
                 if (tumble) p.transform.rotation = Quaternion.Euler(Rand(0f, 360f), Rand(0f, 360f), Rand(0f, 360f)) * p.transform.rotation;
                 PlaceOnFloor(p, at);
                 AddBoxColliders(p);
-                if (at.y <= 0.01f) SettleLater(p); // spilled on the floor: let it tumble to rest
+                if (at.y <= 0.01f) SettleLater(p);
                 return p;
             }
 
@@ -1048,7 +952,6 @@ static partial class GroceryStoreBuilder
                     Item(new Vector3(top.center.x + Rand(-0.3f, 0.3f) * top.size.x, top.max.y - top.size.y * Rand(0.2f, 0.5f),
                         top.center.z + Rand(-0.3f, 0.3f) * top.size.z), tumble: true);
 
-            // Spill fans out from the pile into the walkways on both sides.
             for (int k = rng.Next(10, 18); k > 0; k--)
             {
                 float sideX = rng.Next(2) == 0 ? -1 : 1;
@@ -1059,7 +962,6 @@ static partial class GroceryStoreBuilder
         }
     }
 
-    // Instance scaled so its longest side is `size`.
     static GameObject SpawnSized(GameObject prefab, Transform parent, float size, float yaw)
     {
         var go = Spawn(prefab, parent, yaw, 1);
@@ -1076,7 +978,6 @@ static partial class GroceryStoreBuilder
         return go;
     }
 
-    // Moves the object so its bounds are centered on target (x, z) with the bottom at target.y.
     static void PlaceOnFloor(GameObject go, Vector3 target)
     {
         var b = GetBounds(go);
@@ -1085,9 +986,6 @@ static partial class GroceryStoreBuilder
 
     static readonly Dictionary<Mesh, Vector3[]> vertexCache = new Dictionary<Mesh, Vector3[]>();
 
-    // Tight world-space bounds from the actual mesh vertices. Renderer.bounds is a box around a
-    // rotated box, which sits lower than the real geometry for anything tilted, so objects
-    // "placed on the floor" with it end up hovering.
     static Bounds GetBounds(GameObject go)
     {
         bool any = false;
@@ -1118,8 +1016,6 @@ static partial class GroceryStoreBuilder
         return b;
     }
 
-    // A model is only usable if it actually imported with geometry. A broken or placeholder file
-    // (e.g. a Git LFS pointer that was never downloaded) imports as an empty object.
     static GameObject Usable(GameObject prefab, string path)
     {
         if (prefab == null) return null;
@@ -1128,7 +1024,6 @@ static partial class GroceryStoreBuilder
         return null;
     }
 
-    // Every model folder gets Read/Write enabled so GetBounds and the shelf scan can see vertices.
     static void MakeModelsReadable()
     {
         foreach (var folder in new[] { ModelFolder, KenneyFolder, FoodKitFolder })
@@ -1151,8 +1046,6 @@ static partial class GroceryStoreBuilder
                 mf.gameObject.AddComponent<MeshCollider>().sharedMesh = mf.sharedMesh;
     }
 
-    // A BoxCollider added next to a MeshFilter sizes itself to that mesh. Some Kenney models are
-    // mirrored (negative scale), which BoxCollider can't handle, so those get a convex MeshCollider.
     static void AddBoxColliders(GameObject go)
     {
         foreach (var mf in go.GetComponentsInChildren<MeshFilter>())

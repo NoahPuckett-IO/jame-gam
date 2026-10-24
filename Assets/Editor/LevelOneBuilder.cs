@@ -3,15 +3,6 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
 
-// Level One for GroceryStoreBuilder: the first hallway (walkway 0). Henry wakes up in a cereal box
-// lying on its side, then works through three puzzles built from store items, with tutorial cards
-// along the way, and a cutscene at the far end where he rounds the corner into the next hall.
-// Also sets up the HUD pieces every level uses (tutorial card, letterbox bars, fader) and the
-// checkpoints at each turning point of the S-shaped route.
-//
-//   z ─────────────────────────────────────────────────────────────────────────────────────►
-//   [wake-up box] ... [matchbox → ruler on a can → fallen cereal boxes] ... [carry box → box ledge]
-//   ... [carry box + spatula lever on a jar → cutting-board ramp → cracker-box wall] ... corner
 static partial class GroceryStoreBuilder
 {
     static (RectTransform top, RectTransform bottom) cinematicBars;
@@ -41,7 +32,6 @@ static partial class GroceryStoreBuilder
         float northCorridor = (aisleLength / 2 + depth / 2 - CoolerDepth) / 2;
         float southCorridor = -northCorridor;
 
-        // End of the first hall: a smooth curve round the corner into walkway 1, ending facing south.
         var cut = new GameObject("Corner Cutscene").transform;
         cut.SetParent(level);
         cut.position = new Vector3(xc, 5, aisleLength / 2 + 1f);
@@ -58,7 +48,6 @@ static partial class GroceryStoreBuilder
         };
         cut.gameObject.AddComponent<CornerCutscene>().Setup(points, cinematicBars.top, cinematicBars.bottom);
 
-        // Plain checkpoints at the later turns: walkway 1 turns at the south end, 2 at the north, ...
         for (int k = 1; k < walkways.Count - 1; k++)
         {
             bool south = k % 2 == 1;
@@ -100,8 +89,6 @@ static partial class GroceryStoreBuilder
         s.transform.position = center;
         s.size = size;
     }
-
-    // ---------- Cereal boxes ----------
 
     const float CerealW = 0.32f * Scale, CerealH = 0.45f * Scale, CerealD = 0.1f * Scale;
 
@@ -146,8 +133,6 @@ static partial class GroceryStoreBuilder
         return mat;
     }
 
-    // A family-size cereal box, built upright at the origin (front facing -Z): a printed body plus
-    // painted front and back art panels with the brand name in crisp 3D type over the logo panel.
     static GameObject CerealBox(Transform parent, int style, float sizeScale = 1f)
     {
         style = ((style % Cereals.Length) + Cereals.Length) % Cereals.Length;
@@ -157,7 +142,6 @@ static partial class GroceryStoreBuilder
         float W = CerealW * sizeScale, H = CerealH * sizeScale, D = CerealD * sizeScale;
         Box("Box", root.transform, Vector3.zero, new Vector3(W, H, D), CerealMat(style, CerealPart.Body));
         var frontMat = CerealMat(style, CerealPart.Front);
-        // Narrow sides: nutrition facts + barcode on one, ingredients on the other; flaps top and bottom.
         ArtQuad(root.transform, "Nutrition Side", new Vector3(W / 2 + 0.02f, 0, 0), Quaternion.Euler(0, -90, 0), new Vector2(D, H), CerealMat(style, CerealPart.Side));
         ArtQuad(root.transform, "Ingredients Side", new Vector3(-W / 2 - 0.02f, 0, 0), Quaternion.Euler(0, 90, 0), new Vector2(D, H), CerealMat(style, CerealPart.SideB));
         ArtQuad(root.transform, "Top Flaps", new Vector3(0, H / 2 + 0.02f, 0), Quaternion.Euler(90, 0, 0), new Vector2(W, D), CerealMat(style, CerealPart.Top));
@@ -174,7 +158,7 @@ static partial class GroceryStoreBuilder
 
             float yaw = face < 0 ? 0 : 180;
             var outward = new Vector3(0, 0, face * (D / 2 + 0.06f));
-            var right = face < 0 ? 1f : -1f; // the art's +x as seen from this side
+            var right = face < 0 ? 1f : -1f;
             MakeText(root.transform, new Vector3(0, H * 0.3f, 0) + outward, yaw, s.brand, W * 0.8f, H * 0.2f, Color.white);
             MakeText(root.transform, new Vector3(0, H * 0.165f, 0) + outward, yaw, s.tag, W * 0.6f, H * 0.035f, new Color(1f, 1f, 0.85f));
             MakeText(root.transform, new Vector3(right * W * 0.324f, H * 0.083f, 0) + outward, yaw, "NEW!", W * 0.16f, H * 0.04f, Color.white);
@@ -204,32 +188,24 @@ static partial class GroceryStoreBuilder
         return box;
     }
 
-    // ---------- Wake-up box ----------
-
-    // The box Henry wakes up in: a cereal box lying on its side, open end facing up the aisle.
-    // Built as five thin panels so he can actually be inside it.
     static void WakeUpBox(Transform parent, Vector3 spawn, out Transform inside, out Transform outside)
     {
         var root = new GameObject("Wake-up Cereal Box").transform;
         root.SetParent(parent);
         const int style = 0;
-        float W = CerealW, H = CerealH, D = CerealD * 1.4f, t = 0.1f; // a little roomier so he fits
-        // Final orientation: length H along +Z (open end north), height W, width D.
+        float W = CerealW, H = CerealH, D = CerealD * 1.4f, t = 0.1f;
         var c = new Vector3(spawn.x, W / 2, spawn.z - H / 2 - 1f);
-        // Panels are plain cardboard (what you see inside); printed art covers their outer faces.
         var card = CerealMat(style, CerealPart.Cardboard);
         card.SetTextureScale("_BaseMap", new Vector2(3, 3));
         var front = CerealMat(style, CerealPart.Front);
         Box("Floor Panel", root, c + Vector3.down * (W / 2 - t / 2), new Vector3(D, t, H), card);
         Box("Roof Panel", root, c + Vector3.up * (W / 2 - t / 2), new Vector3(D, t, H), card);
         Box("Bottom Panel", root, c + Vector3.back * (H / 2 - t / 2), new Vector3(D, W, t), card);
-        // Outside of the roof is the box's nutrition side; outside of the closed end is its bottom flaps.
         ArtQuad(root, "Nutrition Side", c + Vector3.up * (W / 2 + 0.01f), Quaternion.Euler(90, 0, 0), new Vector2(D, H), CerealMat(style, CerealPart.Side));
         ArtQuad(root, "Bottom Flaps", c + Vector3.back * (H / 2 + 0.01f), Quaternion.Euler(0, 0, 90), new Vector2(W, D), CerealMat(style, CerealPart.Top));
         foreach (int s in new[] { -1, 1 })
         {
             Box(s < 0 ? "West Panel" : "East Panel", root, c + Vector3.right * s * (D / 2 - t / 2), new Vector3(t, W, H), card);
-            // The printed front art, turned on its side like the box.
             var q = GameObject.CreatePrimitive(PrimitiveType.Quad);
             q.name = "Front Art";
             q.transform.SetParent(root);
@@ -239,17 +215,14 @@ static partial class GroceryStoreBuilder
             q.GetComponent<Renderer>().sharedMaterial = front;
             Object.DestroyImmediate(q.GetComponent<Collider>());
         }
-        // Open flaps sagging at the open end.
         var flapMat = card;
         var flapL = Box2("Flap", root, c + new Vector3(0, W / 2 - 0.2f, H / 2 + 1.2f), new Vector3(D * 0.9f, t, 2.4f), flapMat);
         flapL.transform.RotateAround(c + new Vector3(0, W / 2, H / 2), Vector3.right, 35f);
         var flapB = Box2("Flap", root, c + new Vector3(0, -W / 2 + 0.05f, H / 2 + 1.2f), new Vector3(D * 0.9f, t, 2.4f), flapMat);
         flapB.transform.RotateAround(c + new Vector3(0, -W / 2, H / 2), Vector3.right, -8f);
-        // Spilled cereal around the opening.
         SpillPieces(root, c + new Vector3(0, -W / 2, H / 2 + 3f), 4f, 40);
 
         inside = Waypoint(root, "Inside", new Vector3(c.x, 1f, c.z - H * 0.15f), 0);
-        // Far enough out that the follow camera behind him clears the box.
         outside = Waypoint(root, "Outside", new Vector3(c.x, 1f, c.z + H / 2 + 9f), 0);
     }
 
@@ -259,7 +232,6 @@ static partial class GroceryStoreBuilder
         return parent.GetChild(parent.childCount - 1).gameObject;
     }
 
-    // Little cereal pieces (tiny donut rings) scattered on the floor. Visual only.
     static void SpillPieces(Transform parent, Vector3 center, float radius, int count)
     {
         var ring = LoadModel("k:donut");
@@ -279,10 +251,6 @@ static partial class GroceryStoreBuilder
         }
     }
 
-    // ---------- Litter ----------
-
-    // Wrappers, crushed cans, cups, broken plates, chopsticks... strewn along the hall, mostly near
-    // the shelves so the middle stays clear. Visual only (no colliders).
     static void ScatterLitter(Transform parent, float xc, float w, float z0, float z1, int seed)
     {
         var root = new GameObject("Litter").transform;
@@ -304,7 +272,6 @@ static partial class GroceryStoreBuilder
             float z = Mathf.Lerp(z0, z1, (float)rng.NextDouble());
             if (rng.NextDouble() < 0.18)
             {
-                // A crumpled receipt.
                 var r = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 r.name = "Receipt";
                 r.transform.SetParent(root);
@@ -316,7 +283,6 @@ static partial class GroceryStoreBuilder
             }
             var t = items[rng.Next(items.Count)];
             var p = Spawn(t.prefab, root, (float)rng.NextDouble() * 360f, t.size / Mathf.Max(t.bounds.x, t.bounds.y, t.bounds.z));
-            // Only round things (cans, cups, sticks) roll onto their sides; plates, bags and wrappers lie flat.
             string n = t.prefab.name;
             bool rolls = n.Contains("can") || n.Contains("Can") || n.Contains("cup") || n.Contains("stick") || n.Contains("chopstick");
             if (rolls && rng.NextDouble() < 0.7) p.transform.rotation = Quaternion.Euler(90, (float)rng.NextDouble() * 360f, 0) * p.transform.rotation;
@@ -325,19 +291,12 @@ static partial class GroceryStoreBuilder
         }
     }
 
-    // ---------- Puzzle 1: the ruler and the cereal boxes ----------
-
-    // A handful of family-size cereal boxes have toppled across the hall. Too tall to jump, and
-    // every gap is sealed up to the ceiling. A wooden ruler balances on a can, its long end tucked
-    // right under the middle box. Hop up via a matchbox onto the short end; Henry's weight tips the
-    // ruler and the box rides up on its tip, high enough to walk underneath.
     static void BuildSeesawPuzzle(Transform level, float xc, float w, float barrierZ)
     {
         var root = new GameObject("Puzzle 1 - Ruler").transform;
         root.SetParent(level);
         float xL = xc - w / 2, xR = xc + w / 2;
 
-        // The gate box lies on its side, square to the hall, so the ruler fits under it.
         var gate = CerealBox(root, 0);
         gate.name = "Gate Cereal Box";
         gate.transform.rotation = Quaternion.Euler(0, 0, 90);
@@ -346,8 +305,6 @@ static partial class GroceryStoreBuilder
         var gb = GetBounds(gate);
         var lifted = gate.AddComponent<LiftedGate>();
 
-        // Its neighbours: one on its side either side of it, one toppling against each shelf, and one
-        // dropped on top. Physics settles them (SettleProps) so they lean and lie where they would.
         var a = Fallen(root, 1, Quaternion.Euler(0, 7, 90), new Vector3(gb.min.x - CerealH / 2 - 0.5f, 0, barrierZ + 0.6f));
         Fallen(root, 2, Quaternion.Euler(0, -12, 14), new Vector3(xL + CerealW / 2 + 1.2f, 0, barrierZ - 0.4f));
         Fallen(root, 3, Quaternion.Euler(0, -5, 90), new Vector3(gb.max.x + CerealH / 2 + 0.5f, 0, barrierZ + 0.4f));
@@ -356,15 +313,12 @@ static partial class GroceryStoreBuilder
         Fallen(root, 5, Quaternion.Euler(90, 22, 0), new Vector3(ab.center.x, ab.max.y + 0.6f, barrierZ + 0.3f));
         SpillPieces(root, new Vector3(xc - 8f, 0, barrierZ - 4f), 5f, 50);
 
-        // Seals: either side of the gate floor to ceiling, and above the gate's highest point, so the
-        // only way through is underneath it.
         float sealD = 4f;
         Seal(root, "Seal West", new Vector3((xL - 3f + gb.min.x) / 2, WallHeight / 2, barrierZ), new Vector3(gb.min.x - xL + 3f, WallHeight, sealD));
         Seal(root, "Seal East", new Vector3((gb.max.x + xR + 3f) / 2, WallHeight / 2, barrierZ), new Vector3(xR + 3f - gb.max.x, WallHeight, sealD));
         float liftedTop = gb.max.y + 6.5f;
         Seal(root, "Seal Above", new Vector3(xc, (liftedTop + WallHeight) / 2, barrierZ), new Vector3(gb.size.x + 0.4f, WallHeight - liftedTop, sealD));
 
-        // The ruler on its can: short near arm, long far arm, long end's tip under the box's middle.
         const float nearArm = 8f, farArm = 14f, plankW = 4f, thick = 0.3f;
         var canPrefab = BeanCanBuilder.GetOrCreate();
         var probe = Spawn(canPrefab, null, 0, 1);
@@ -373,8 +327,8 @@ static partial class GroceryStoreBuilder
         float canScale = 0.13f * Scale / pb.size.y;
         float canDiameter = Mathf.Max(pb.size.x, pb.size.z) * canScale;
         float pivotY = canDiameter + thick / 2;
-        float rest = Mathf.Asin(pivotY / farArm) * Mathf.Rad2Deg;     // long end on the floor
-        float tipped = -Mathf.Asin(pivotY / nearArm) * Mathf.Rad2Deg; // short end on the floor
+        float rest = Mathf.Asin(pivotY / farArm) * Mathf.Rad2Deg;
+        float tipped = -Mathf.Asin(pivotY / nearArm) * Mathf.Rad2Deg;
         float tipZ = gb.center.z;
         float pivotZ = tipZ - farArm * Mathf.Cos(rest * Mathf.Deg2Rad);
 
@@ -389,7 +343,6 @@ static partial class GroceryStoreBuilder
         lifted.Setup(gb.min.y + 0.25f);
         pivot.gameObject.AddComponent<Seesaw>().Setup(pivot, rest, tipped, farArm, thick, 0f, lifted);
 
-        // A matchbox to climb up onto the raised short end.
         float nearTipZ = pivotZ - nearArm * Mathf.Cos(rest * Mathf.Deg2Rad);
         Matchbox(root, new Vector3(xc, 0, nearTipZ - 1.4f));
 
@@ -397,7 +350,6 @@ static partial class GroceryStoreBuilder
             "Climb the matchbox and jump onto the short end of the ruler. Your weight will lever the box up.", "SPACE");
     }
 
-    // A plank on a pivot transform (the transform the Seesaw rotates). Local +Z is the far arm.
     static Transform Plank(Transform parent, string name, Vector3 pivotAt, float nearArm, float farArm, float width, float thick, Material mat, bool ticks)
     {
         var pivot = new GameObject($"{name} Pivot").transform;
@@ -433,7 +385,7 @@ static partial class GroceryStoreBuilder
     {
         var root = new GameObject("Matchbox").transform;
         root.SetParent(parent);
-        var size = new Vector3(2.8f, 1.6f, 1.8f); // low enough to hop onto, high enough to reach the ruler from
+        var size = new Vector3(2.8f, 1.6f, 1.8f);
         Box("Matchbox", root, floorAt + Vector3.up * size.y / 2, size, GetMaterial("Matchbox", new Color(0.15f, 0.3f, 0.7f)));
         Box("Strike Strip", root, floorAt + new Vector3(size.x / 2 + 0.01f, size.y / 2, 0), new Vector3(0.03f, size.y * 0.7f, size.z * 0.9f),
             GetMaterial("Strike Strip", new Color(0.35f, 0.2f, 0.12f)));
@@ -455,10 +407,6 @@ static partial class GroceryStoreBuilder
         return step;
     }
 
-    // ---------- Puzzle 2: the step ----------
-
-    // A ledge of flattened boxes is just too high to jump. A small box nearby can be carried (E)
-    // and dropped against it as a step.
     static void BuildStepPuzzle(Transform level, float xc, float w, float ledgeZ)
     {
         var root = new GameObject("Puzzle 2 - Step").transform;
@@ -483,22 +431,12 @@ static partial class GroceryStoreBuilder
             "Pick up the small box, carry it to the ledge and put it down to use as a step.", "E");
     }
 
-    // ---------- Puzzle 3: carry + lever + ramp ----------
-
-    // A wall of flattened cracker boxes, too high to climb even with a step. In front of it a
-    // cutting board lies flat, its far end resting on the tip of a wooden spatula balanced on a jar
-    // of peanut butter that sits off to one side. The spatula's short end is too high to jump onto,
-    // so: carry the box over as a step, climb onto the spatula's short end, and the long end swings
-    // up, lifting the cutting board into a ramp. Walk up it and over the wall.
     static void BuildRampPuzzle(Transform level, float xc, float w, float wallZ)
     {
         var root = new GameObject("Puzzle 3 - Ramp").transform;
         root.SetParent(level);
         float xL = xc - w / 2, xR = xc + w / 2;
 
-        // The wall: three layers of cracker boxes lying flat (long side across the hall, face up),
-        // staggered like bricks. Boxes at the ends of a layer are shorter ones cut to fit, so no two
-        // boxes overlap.
         float layerH = CerealD, boxLen = CerealH, wallD = CerealW;
         int layers = 3;
         float wallTop = layers * layerH;
@@ -509,16 +447,15 @@ static partial class GroceryStoreBuilder
             {
                 float a = Mathf.Max(x, xL), b = Mathf.Min(x + boxLen, xR);
                 if (b - a < 1f) continue;
-                float len = b - a - 0.08f; // hairline gap between neighbours
+                float len = b - a - 0.08f;
                 var bx = CerealBox(root, 5);
-                bx.transform.localScale = new Vector3(1f, len / boxLen, 1f); // shortened along its length (local Y) only
+                bx.transform.localScale = new Vector3(1f, len / boxLen, 1f);
                 bx.transform.rotation = Quaternion.Euler(90, 90, 0) * Quaternion.Euler(0, (layer + (int)(x * 0.1f)) % 2 == 0 ? 0 : 180, 0);
                 PlaceOnFloor(bx, new Vector3((a + b) / 2, layer * layerH, wallZ + wallD / 2));
             }
         }
         Solid(root, "Wall Collider", new Vector3(xc, wallTop / 2, wallZ + wallD / 2), new Vector3(w + 2f, wallTop, wallD));
 
-        // The ramp: a cutting board lying flat, hinged at its near (south) end.
         const float rampLen = 15f, rampW = 6f;
         float rampFarZ = wallZ - 0.6f;
         var hinge = new GameObject("Ramp Hinge").transform;
@@ -544,9 +481,6 @@ static partial class GroceryStoreBuilder
         var ramp = hinge.gameObject.AddComponent<LiftedRamp>();
         ramp.Setup(rampLen, wallTop - 0.3f, 0f);
 
-        // The lever runs across the hall: pivot (a peanut butter jar on its side) to the west of the
-        // ramp, short arm further west, long arm east so its tip ends under the ramp's far end.
-        // Short end rests ~2.8 up: out of jumping reach, but reachable from the carried box.
         const float nearArm = 4f, farArm = 7f, plankW = 3f, thick = 0.4f, pivotH = 1.6f;
         float tipX = xc + 1f;
         float pivotX = tipX - farArm;
@@ -558,7 +492,7 @@ static partial class GroceryStoreBuilder
             var jar = Spawn(jarPrefab, root, 0, 1);
             var jb = GetBounds(jar);
             jar.transform.localScale *= pivotH / Mathf.Max(jb.size.x, jb.size.z);
-            jar.transform.rotation = Quaternion.Euler(90, 0, 0) * jar.transform.rotation; // on its side, axis along the hall
+            jar.transform.rotation = Quaternion.Euler(90, 0, 0) * jar.transform.rotation;
             PlaceOnFloor(jar, new Vector3(pivotX, 0, rampFarZ));
             AddBoxColliders(jar);
         }
@@ -575,8 +509,6 @@ static partial class GroceryStoreBuilder
             "Bring the box over to the spatula's raised end, climb on, and your weight will lift the cutting board into a ramp.", "E", "SPACE");
     }
 
-    // ---------- Tutorial cards, cinematic bars, fader ----------
-
     static void TutorialZoneAt(Transform parent, Vector3 center, Vector3 size, string icon, string title, string body, params string[] keys)
     {
         var z = new GameObject($"Tutorial - {title}");
@@ -590,8 +522,6 @@ static partial class GroceryStoreBuilder
 
     static Text skipHint;
 
-    // Top-of-screen card: rounded dark panel, teal accent, big icon, title, help line, key chips.
-    // The same canvas carries the screen fader and the intro's "skip" hint.
     static void BuildTutorialHud()
     {
         var old = GameObject.Find("Tutorial HUD");
@@ -651,7 +581,6 @@ static partial class GroceryStoreBuilder
         var group = cardGroupGo.GetComponent<CanvasGroup>();
         group.interactable = group.blocksRaycasts = false;
 
-        // Top of the screen, so it never covers Henry.
         var card = Rect("Card", cardGroupRt, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -140), new Vector2(980, 190));
         Img(card, new Color(0.04f, 0.06f, 0.07f, 0.9f));
         card.gameObject.AddComponent<Outline>().effectColor = new Color(accent.r, accent.g, accent.b, 0.35f);
@@ -679,13 +608,11 @@ static partial class GroceryStoreBuilder
         }
         canvasGo.AddComponent<TutorialPopup>().Setup(group, card, icon, title, body, chips, labels);
 
-        // Skip hint for the intro, bottom right.
         skipHint = Txt(Rect("Skip Hint", canvasGo.transform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-180, 60), new Vector2(320, 50)),
             titleFont, 34, new Color(1, 1, 1, 0.7f), TextAnchor.MiddleRight);
         skipHint.text = "SPACE  TO SKIP";
         skipHint.gameObject.SetActive(false);
 
-        // Full-screen fader on top of everything.
         var fadeRt = Rect("Fader", canvasGo.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
         fadeRt.offsetMin = fadeRt.offsetMax = Vector2.zero;
         var fade = fadeRt.gameObject.AddComponent<Image>();
@@ -695,7 +622,6 @@ static partial class GroceryStoreBuilder
         canvasGo.AddComponent<ScreenFader>().Setup(fade);
     }
 
-    // Letterbox bars for cutscenes, hidden until one plays.
     static (RectTransform top, RectTransform bottom) BuildCinematicBars()
     {
         var old = GameObject.Find("Cinematic Bars");

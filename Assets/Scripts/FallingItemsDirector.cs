@@ -1,12 +1,9 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// The collapsing aisle: while Henry is in this hall, groceries keep getting knocked off both
-// shelves and crash onto the floor. Most are aimed just ahead of where he's running (so standing
-// still or dawdling gets you flattened); the rest land randomly. It gets busier the further he gets.
 public class FallingItemsDirector : MonoBehaviour
 {
-    [SerializeField] GameObject[] templates;  // inactive, correctly scaled store items
+    [SerializeField] GameObject[] templates;
     [SerializeField] float hallX, halfWidth, zStart, zEnd;
     [SerializeField] float[] shelfHeights = { 8.6f, 17.3f, 25.9f };
     [SerializeField] Material dashMaterial;
@@ -39,25 +36,36 @@ public class FallingItemsDirector : MonoBehaviour
         float progress = Mathf.InverseLerp(zStart, zEnd, p.z);
         next = Time.time + Mathf.Lerp(0.34f, 0.17f, progress) * Random.Range(0.8f, 1.2f);
 
-        // Half ahead of Henry, where he'll be in about warnTime; half anywhere in the next stretch.
         var vel = player.GetComponent<CharacterController>().velocity;
+        var flat = new Vector3(vel.x, 0, vel.z);
         Vector3 target;
-        if (Random.value < 0.5f)
-            target = p + new Vector3(vel.x, 0, vel.z) * warnTime + new Vector3(Random.Range(-4f, 4f), 0, dir * Random.Range(0f, 8f));
+        float roll = Random.value;
+        if (roll < 0.3f)
+            target = p + flat * warnTime;
+        else if (roll < 0.45f)
+            target = p + flat * (warnTime * 0.5f);
+        else if (roll < 0.75f)
+            target = p + flat * warnTime + new Vector3(Random.Range(-4f, 4f), 0, dir * Random.Range(0f, 8f));
         else
             target = new Vector3(hallX + Random.Range(-halfWidth, halfWidth), 0, p.z + dir * Random.Range(4f, 45f));
         target.x = Mathf.Clamp(target.x, hallX - halfWidth + 2f, hallX + halfWidth - 2f);
         target.y = 0;
 
-        // Knocked off whichever shelf is nearer, from a random board.
         float side = target.x > hallX ? 1f : -1f;
-        var from = new Vector3(hallX + side * (halfWidth + 3f), shelfHeights[Random.Range(0, shelfHeights.Length)] + 1f, target.z + Random.Range(-3f, 3f));
+        Drop(target, hallX + side * (halfWidth + 3f));
+    }
 
+    public void Drop(Vector3 target, float shelfX, float warn = -1f)
+    {
+        if (templates == null || templates.Length == 0) return;
+        if (player == null) player = FindAnyObjectByType<PlayerController>();
+        FallingItem.DashMaterial = dashMaterial;
+        var from = new Vector3(shelfX, shelfHeights[Random.Range(0, shelfHeights.Length)] + 1f, target.z + Random.Range(-3f, 3f));
         var item = Instantiate(templates[Random.Range(0, templates.Length)]);
         item.SetActive(true);
         foreach (var c in item.GetComponentsInChildren<Collider>()) c.enabled = false;
         var fi = item.AddComponent<FallingItem>();
-        StartCoroutine(fi.Run(from, target, warnTime, player));
+        StartCoroutine(fi.Run(from, target, warn > 0f ? warn : warnTime, player));
     }
 
     public void Setup(GameObject[] items, float x, float half, float zFrom, float zTo, Material dash)

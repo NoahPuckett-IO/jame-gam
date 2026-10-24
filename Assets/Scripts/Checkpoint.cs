@@ -1,6 +1,5 @@
 using UnityEngine;
 
-// Trigger volume at a turning point. Walking into it makes its `spawn` the player's respawn point.
 [RequireComponent(typeof(BoxCollider))]
 public class Checkpoint : MonoBehaviour
 {

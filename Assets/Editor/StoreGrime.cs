@@ -2,19 +2,12 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
-// Wear and tear for GroceryStoreBuilder: dirt patches on the floor, mold creeping up from the
-// skirting and down from the ceiling, water stains on the ceiling tiles, and a pass that turns the
-// imported models' glossy default materials matte.
 static partial class GroceryStoreBuilder
 {
     const string GrimeFolder = MatFolder + "/Grime";
 
     enum GrimeKind { Dirt, Mold, Stain }
 
-    // ---------- Matte products ----------
-
-    // Imported FBX materials default to fairly glossy. Swap each one for a matte copy (cached as an
-    // asset, so every instance of a product shares one material).
     static void MakeProductsMatte(Transform root)
     {
         const string folder = MatFolder + "/Matte";
@@ -45,8 +38,6 @@ static partial class GroceryStoreBuilder
                     matte.SetFloat("_Smoothness", 0.12f);
                     matte.SetFloat("_Metallic", 0f);
                     matte.SetFloat("_EnvironmentReflections", 0.3f);
-                    // Draw both faces: some models (open boxes, wrappers, cups) are single-sided shells
-                    // you could otherwise see straight through from behind.
                     matte.SetFloat("_Cull", 0f);
                     matte.doubleSidedGI = true;
                     copies[m] = matte;
@@ -58,8 +49,6 @@ static partial class GroceryStoreBuilder
         }
     }
 
-    // ---------- Grime decals ----------
-
     static void AddGrime(Transform store, float left, float right, float depth)
     {
         var root = new GameObject("Grime").transform;
@@ -70,15 +59,12 @@ static partial class GroceryStoreBuilder
         var mold = GrimeMaterial(GrimeKind.Mold);
         int layer = 0;
 
-        // Floor: dirt patches and scuffs.
         for (int i = 0; i < 90; i++)
         {
             float s = R(0.6f, 2.8f) * Scale;
             Decal(root, dirt, new Vector3(R(left, right), 0.02f + (layer++ % 40) * 0.002f, R(-depth / 2, depth / 2)),
                 Quaternion.Euler(90, R(0, 360), 0), new Vector2(s, s * R(0.6f, 1.4f)));
         }
-        // Ceiling: water damage in clusters (a leak spreads over neighbouring tiles), mixing six
-        // different stain shapes and tints so no two patches look alike.
         var stains = new Material[StainVariants];
         for (int v = 0; v < StainVariants; v++) stains[v] = StainMaterial(v);
         for (int c = 0; c < 14; c++)
@@ -93,13 +79,12 @@ static partial class GroceryStoreBuilder
                     Quaternion.Euler(-90, R(0, 360), 0), new Vector2(s, s * R(0.65f, 1.35f)));
             }
         }
-        // Walls: mold rising from the floor and creeping down from the ceiling.
         var walls = new[]
         {
-            (from: new Vector3(left, 0, depth / 2), to: new Vector3(right, 0, depth / 2), yaw: 0f),        // north, faces -Z
-            (from: new Vector3(left, 0, -depth / 2), to: new Vector3(right, 0, -depth / 2), yaw: 180f),    // south, faces +Z
-            (from: new Vector3(right, 0, -depth / 2), to: new Vector3(right, 0, depth / 2), yaw: 90f),     // east, faces -X
-            (from: new Vector3(left, 0, -depth / 2), to: new Vector3(left, 0, depth / 2), yaw: -90f),      // west, faces +X
+            (from: new Vector3(left, 0, depth / 2), to: new Vector3(right, 0, depth / 2), yaw: 0f),
+            (from: new Vector3(left, 0, -depth / 2), to: new Vector3(right, 0, -depth / 2), yaw: 180f),
+            (from: new Vector3(right, 0, -depth / 2), to: new Vector3(right, 0, depth / 2), yaw: 90f),
+            (from: new Vector3(left, 0, -depth / 2), to: new Vector3(left, 0, depth / 2), yaw: -90f),
         };
         foreach (var w in walls)
         {
@@ -128,7 +113,6 @@ static partial class GroceryStoreBuilder
         r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
     }
 
-    // Procedural splotch textures with soft, ragged alpha edges, generated once as PNGs.
     static Material GrimeMaterial(GrimeKind kind)
     {
         if (!AssetDatabase.IsValidFolder(GrimeFolder)) AssetDatabase.CreateFolder(MatFolder, "Grime");
@@ -154,13 +138,11 @@ static partial class GroceryStoreBuilder
                         c = Color.Lerp(new Color(0.16f, 0.13f, 0.1f), new Color(0.3f, 0.25f, 0.18f), fine);
                         break;
                     case GrimeKind.Mold:
-                        // Clusters of dark spots that thin out towards the edge.
                         float spots = Mathf.Clamp01((fine - 0.45f) * 4f);
                         a = Mathf.Clamp01((1f - r) * 1.3f + (n - 0.5f) * 1.6f - 0.15f) * Mathf.Lerp(0.35f, 1f, spots) * 0.85f;
                         c = Color.Lerp(new Color(0.12f, 0.16f, 0.08f), new Color(0.03f, 0.05f, 0.03f), spots);
                         break;
                     default:
-                        // Water stain: pale middle, dark tide-mark ring.
                         float ring = Mathf.Exp(-Mathf.Pow((r + (n - 0.5f) * 0.35f - 0.8f) * 7f, 2f));
                         a = Mathf.Clamp01(ring * 0.8f + Mathf.Clamp01(0.8f - r) * 0.25f) * (0.7f + 0.3f * fine);
                         c = Color.Lerp(new Color(0.55f, 0.42f, 0.22f), new Color(0.35f, 0.24f, 0.1f), ring);
@@ -189,9 +171,6 @@ static partial class GroceryStoreBuilder
 
     const int StainVariants = 6;
 
-    // Water stains on ceiling tiles: an irregular, domain-warped blob with several dark tide-mark
-    // rings, a paler bleached middle and the odd drip blot. Each variant has its own shape, ring
-    // count and tint, from yellowed to rusty to grey-brown.
     static Material StainMaterial(int variant)
     {
         if (!AssetDatabase.IsValidFolder(GrimeFolder)) AssetDatabase.CreateFolder(MatFolder, "Grime");
@@ -210,7 +189,6 @@ static partial class GroceryStoreBuilder
             var tint = tints[variant % tints.Length];
             int rings = 2 + variant % 3;
             float lumpiness = 0.25f + 0.08f * (variant % 4);
-            // A few extra blots around the main stain.
             var blots = new List<Vector3>();
             for (int i = 0; i < 3 + variant % 3; i++)
             {
@@ -221,7 +199,6 @@ static partial class GroceryStoreBuilder
             for (int x = 0; x < size; x++)
             {
                 float u = (x / (float)size - 0.5f) * 2f, v = (y / (float)size - 0.5f) * 2f;
-                // Warp the coordinates so the outline is ragged, not a circle.
                 float wu = u + (Fbm(x / 70f, y / 70f, seed) - 0.5f) * lumpiness * 2f;
                 float wv = v + (Fbm(x / 70f + 9f, y / 70f + 4f, seed) - 0.5f) * lumpiness * 2f;
                 float r = Mathf.Sqrt(wu * wu + wv * wv) / 0.75f;

@@ -1,8 +1,6 @@
 using System.Collections;
 using UnityEngine;
 
-// A stale cracker (or thin ice) that holds Henry for a moment, then cracks and drops away. It
-// shakes as a warning, falls, and is back in place a few seconds later.
 public class CrumblePlatform : MonoBehaviour
 {
     [SerializeField] float holdSeconds = 0.9f;

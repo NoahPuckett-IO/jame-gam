@@ -3,15 +3,6 @@ using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
 
-// Henry, the player character: Kenney "Animated Characters" medium model (CC0) wearing the
-// skaterMaleA skin, animated with Quaternius' "Universal Animation Library" (CC0) through Unity's
-// Humanoid retargeting.
-//
-//   Base layer:  Locomotion blend (Idle → Walk → Jog → Sprint by ground speed),
-//                Jump start → loop → land, PickUp, Hit, plus named one-shots for cutscenes
-//                (Crawl, CrouchIdle, WakeUp, Flail, Push, Death).
-//   Arms layer:  an arms-forward pose (from Driving_Loop) on the arms and chest only, faded in
-//                while carrying so the box sits in his hands.
 static class CharacterSetup
 {
     public const string ModelPath = "Assets/ThirdParty/KenneyAnimChar/characterMedium.fbx";
@@ -51,8 +42,6 @@ static class CharacterSetup
                     {
                         c.loopTime = loop;
                         c.lockRootRotation = true;
-                        // Bake the root rotation from the file's own orientation ("Body Orientation" turned the
-                        // walk cycles sideways); the Quaternius rig faces backwards in it, hence the 180.
                         c.keepOriginalOrientation = true;
                         c.rotationOffset = 180f;
                         c.lockRootHeightY = true;
@@ -74,8 +63,6 @@ static class CharacterSetup
         AssetDatabase.LoadAllAssetsAtPath(AnimPath).OfType<AnimationClip>()
             .FirstOrDefault(c => Short(c.name) == name && !c.name.StartsWith("__preview"));
 
-    // Kenney's character uses a separate skin texture; give it a matte material with a touch of
-    // self-light so Henry reads clearly in the dark aisles.
     public static Material HenryMaterial()
     {
         var mat = AssetDatabase.LoadAssetAtPath<Material>(MaterialPath);
@@ -107,7 +94,6 @@ static class CharacterSetup
 
         var sm = ctrl.layers[0].stateMachine;
 
-        // Locomotion by ground speed in world units/second.
         var move = sm.AddState("Locomotion");
         var tree = new BlendTree { name = "Locomotion", blendParameter = "Speed", useAutomaticThresholds = false };
         AssetDatabase.AddObjectToAsset(tree, ctrl);
@@ -130,7 +116,6 @@ static class CharacterSetup
         var jumpLand = State("JumpLand", "Jump_Land", 1.8f);
         var pick = State("PickUp", "PickUp_Table", 1.7f);
         var hit = State("Hit", "Hit_Chest", 1.3f);
-        // Named states the cutscenes cross-fade to directly.
         State("Crawl", "Crouch_Fwd_Loop");
         State("CrouchIdle", "Crouch_Idle_Loop");
         State("WakeUp", "Sitting_Exit");
@@ -164,7 +149,6 @@ static class CharacterSetup
         anyHit.AddCondition(AnimatorConditionMode.If, 0, "Hit");
         T(hit, move, 0.2f, exit: true, exitTime: 0.85f);
 
-        // Arms layer for carrying: arms + chest only.
         var mask = new AvatarMask();
         for (int i = 0; i < (int)AvatarMaskBodyPart.LastBodyPart; i++)
             mask.SetHumanoidBodyPartActive((AvatarMaskBodyPart)i, false);
@@ -185,14 +169,13 @@ static class CharacterSetup
         AssetDatabase.AddObjectToAsset(arms.stateMachine, ctrl);
         var hold = arms.stateMachine.AddState("Hold");
         hold.motion = Clip("Driving_Loop");
-        hold.speed = 0.2f; // nearly still: just a hint of the arms adjusting their grip
+        hold.speed = 0.2f;
         arms.stateMachine.defaultState = hold;
         ctrl.AddLayer(arms);
 
-        // Look-at IK for cutscenes (HeadLook), and hand IK while carrying.
         var layers = ctrl.layers;
         layers[0].iKPass = true;
-        layers[1].iKPass = true; // CarryIK puts his hands on the sides of what he carries
+        layers[1].iKPass = true;
         ctrl.layers = layers;
 
         AssetDatabase.SaveAssets();

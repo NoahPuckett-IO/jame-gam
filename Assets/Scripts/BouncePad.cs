@@ -1,7 +1,5 @@
 using UnityEngine;
 
-// A springy thing (sponge, whipped cream, marshmallow...) that launches Henry upward when he lands
-// on it, squashing and wobbling back as he leaves.
 public class BouncePad : MonoBehaviour
 {
     [SerializeField] float launchSpeed = 22f;

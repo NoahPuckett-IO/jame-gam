@@ -1,7 +1,5 @@
 using UnityEngine;
 
-// A can (or frozen pea bag) rolling back and forth across a shelf or freezer top. Getting caught
-// in its path shoves Henry hard in the direction it's rolling, usually right off the edge.
 public class RollingHazard : MonoBehaviour
 {
     [SerializeField] Vector3 offset = new Vector3(6f, 0f, 0f);
@@ -31,7 +29,6 @@ public class RollingHazard : MonoBehaviour
         else k = 1f - Mathf.SmoothStep(0f, 1f, (t - 2f * pauseSeconds - travelSeconds) / travelSeconds);
         transform.position = start + offset * k;
 
-        // Roll the visual by the distance travelled.
         var moved = transform.position - last;
         last = transform.position;
         velocity = moved / Mathf.Max(Time.deltaTime, 1e-4f);
@@ -48,7 +45,6 @@ public class RollingHazard : MonoBehaviour
         if (hitCooldown > 0f) return;
         var player = other.GetComponent<PlayerController>();
         if (player == null || player.InCutscene) return;
-        // Shoved the way it's rolling; if it's paused at an end, just pushed away from it.
         var away = player.transform.position - transform.position;
         away.y = 0;
         var dir = velocity.sqrMagnitude > 1f ? velocity.normalized : away.normalized;

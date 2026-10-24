@@ -2,13 +2,6 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
-// Level Three: the frozen aisle. Both sides of the third hallway are walls of tall glass-door
-// freezers (they hide the shelving behind them); the floor is solid ice, snow drifts down, and the
-// route goes up:
-//   ice floor → stepping ice cubes across a melt-water pool → carry an ice cube to reach a
-//   popsicle-stick lever on an ice cream tub, which lifts a frozen pizza box out of an ice wall →
-//   three whipped-cream bounce pads up to the freezer tops → along the icy tops, hopping frozen
-//   peas → floating ice cubes across the aisle → an ice slide down to the far end.
 static partial class GroceryStoreBuilder
 {
     const float FreezerHeight = 2.0f * Scale;
@@ -18,21 +11,17 @@ static partial class GroceryStoreBuilder
         var root = new GameObject("Level Three - Freezer Aisle").transform;
         root.SetParent(store);
         float x = walkways[2], half = WalkwayWidth / 2;
-        float xE = x + half, xW = x - half;            // freezer fronts
+        float xE = x + half, xW = x - half;
         float fDepth = shelf.gondolaDepth / 2;
         float zS = -aisleLength / 2, zN = aisleLength / 2;
         var rng = new System.Random(303);
 
-        // Freezer walls on both sides (east one stands in Aisle 2's west half, west one in Aisle 3's east half).
         FreezerWall(root, xE, -1, zS, zN, fDepth, rng);
         FreezerWall(root, xW, +1, zS, zN, fDepth, rng);
 
         var ice = IceMaterial();
-        // Ice sheet over the floor (visual), with a melt-water pool cut out of it.
         float poolA = zS + 14f, poolB = zS + 32f;
         float wallZ = poolB + 34f, bz = wallZ + 14f, crossZ = bz + 76f;
-        // Past the bounce pads the floor is freezing water all the way to the landing at the far end, so
-        // once up on the freezers there's no dropping down and walking the rest.
         float waterA = bz + 18f, finishZ = zN - 11f;
         IceSlab(root, new Vector3(x, 0.08f, (zS + poolA) / 2), new Vector3(WalkwayWidth, 0.16f, poolA - zS));
         IceSlab(root, new Vector3(x, 0.08f, (poolB + waterA) / 2), new Vector3(WalkwayWidth, 0.16f, waterA - poolB));
@@ -55,7 +44,6 @@ static partial class GroceryStoreBuilder
         TutorialZoneAt(root, new Vector3(x, 5, zS + 4f), new Vector3(WalkwayWidth, 10, 14f), "frozen", "BRRR... IT'S ICE",
             "The floor is frozen solid: you'll slide and turn slowly. Don't fall in the melt water.", "WASD", "SPACE");
 
-        // 1. Melt-water pool with bobbing ice cubes to hop across.
         FreezingWater(root, x, poolA, poolB);
         int cubes = 5;
         for (int i = 0; i < cubes; i++)
@@ -65,12 +53,8 @@ static partial class GroceryStoreBuilder
         }
         CheckpointAt(root, "Checkpoint L3-A", new Vector3(x, 0, poolB + 3f), new Vector3(WalkwayWidth, 4, 3), 0);
 
-        // 2. Ice wall with a frozen pizza box gate, lifted by a popsicle stick on an ice cream tub.
-
         IceGatePuzzle(root, x, wallZ, rng);
         CheckpointAt(root, "Checkpoint L3-B", new Vector3(x, 0, wallZ + 5f), new Vector3(WalkwayWidth, 4, 3), 0);
-
-        // 3. Whipped-cream bounce pads up to the east freezer top.
 
         WhippedCream(root, new Vector3(x + 7f, 0.15f, bz), 24f);
         IceTower(root, new Vector3(x + 11f, 0, bz + 7f), 12f);
@@ -81,7 +65,6 @@ static partial class GroceryStoreBuilder
             "Land on the whipped cream to bounce. Steer in the air to reach the next tower.", "SPACE");
         CheckpointAt(root, "Checkpoint L3-C", new Vector3(xE + fDepth / 2, FreezerHeight, bz + 22f), new Vector3(fDepth, 4, 4), 0);
 
-        // 4. Along the east freezer top: piles of frozen peas and tubs to hop over.
         var bags = Measure(new[] { ("k:bag", 0.25f), ("k:ice-cream-cup", 0.12f), ("IceCream", 0.15f), ("k:pizza-box", 0.35f) });
         for (int i = 0; i < 6 && bags.Count > 0; i++)
         {
@@ -91,12 +74,9 @@ static partial class GroceryStoreBuilder
             AddBoxColliders(p);
         }
 
-        // Ice-cream tubs rolling across the freezer top, trying to bowl Henry off into the water.
         RollingCan(root, new Vector3(xE + fDepth - 2.2f, FreezerHeight, bz + 41f), new Vector3(-(fDepth - 4f), 0, 0), 1.1f, 0f, 2.4f);
         RollingCan(root, new Vector3(xE + 2f, FreezerHeight, bz + 55f), new Vector3(fDepth - 4f, 0, 0), 0.9f, 0.5f, 2.4f);
 
-        // 5. Across the aisle at freezer-top height: a bobbing cube, one drifting back and forth, another
-        // bobbing, and a thin sheet of ice that cracks a moment after you land on it.
         FreezingWater(root, x, waterA, finishZ);
         devWarps.Add(("Ice Crossing", new Vector3(xE + fDepth / 2, FreezerHeight + 1f, crossZ - 16f), 0));
         float[] xs = { x + 13f, x + 5f, x - 3f, x - 11f };
@@ -127,28 +107,20 @@ static partial class GroceryStoreBuilder
         }
         TutorialZoneAt(root, new Vector3(xE + fDepth / 2, FreezerHeight + 3f, crossZ - 12f), new Vector3(fDepth, 6f, 8f), "frozen", "ON THIN ICE",
             "Hop across on the ice. One block drifts, and the thin sheet at the end cracks a moment after you land.", "SPACE");
-        // The crossing is boxed in: invisible walls across the aisle either side of it keep anyone
-        // from leaping off the freezers and sailing on down the hall, and ice blocks on the freezer
-        // tops stop the walk at the crossing (east) and past the slide (west).
         foreach (float dz in new[] { -6.5f, 6.5f })
             Seal(root, "Crossing Wall", new Vector3(x, WallHeight / 2, crossZ + dz), new Vector3(WalkwayWidth, WallHeight, 1f));
         IceBarrier(root, xE, xE + fDepth, crossZ + 6.5f);
         IceBarrier(root, xW - fDepth, xW, crossZ - 6.5f);
         IceBarrier(root, xW - fDepth, xW, crossZ + 17f);
-        // And nobody climbs over the back of the freezers into the next hall.
         Seal(root, "Freezer Back East", new Vector3(xE + fDepth + 0.5f, (FreezerHeight + WallHeight) / 2, 0), new Vector3(1f, WallHeight - FreezerHeight, aisleLength));
         Seal(root, "Freezer Back West", new Vector3(xW - fDepth - 0.5f, (FreezerHeight + WallHeight) / 2, 0), new Vector3(1f, WallHeight - FreezerHeight, aisleLength));
         CheckpointAt(root, "Checkpoint L3-D", new Vector3(xW - fDepth / 2, FreezerHeight, crossZ + 4f), new Vector3(fDepth, 4, 4), 0);
 
-        // 6. Ice slide from the west freezer top down to the far end.
         Slide(root, new Vector3(xW - 2f, FreezerHeight, crossZ + 12f), new Vector3(x + 10f, 0.4f, zN - 6f), 5f);
         foreach (var r in root.Find("Baking Tray Slide").GetComponentsInChildren<Renderer>()) r.sharedMaterial = ice;
         root.Find("Baking Tray Slide").name = "Ice Slide";
     }
 
-    // ---------- pieces ----------
-
-    // Icy blue melt water over the floor from zA to zB; falling in sends Henry back to his checkpoint.
     static void FreezingWater(Transform root, float x, float zA, float zB)
     {
         var water = StoreAtmosphere.Glass("Melt Water", new Color(0.25f, 0.55f, 0.85f, 0.7f));
@@ -168,7 +140,6 @@ static partial class GroceryStoreBuilder
         hazard.gameObject.AddComponent<Hazard>();
     }
 
-    // A heap of ice blocks across a freezer top from x0 to x1, sealed up to the ceiling.
     static void IceBarrier(Transform root, float x0, float x1, float z)
     {
         float w = x1 - x0;
@@ -231,7 +202,6 @@ static partial class GroceryStoreBuilder
         return c;
     }
 
-    // Stacked ice blocks up to topY.
     static void IceTower(Transform parent, Vector3 floorAt, float topY)
     {
         int n = Mathf.Max(1, Mathf.RoundToInt(topY / 4f));
@@ -274,7 +244,6 @@ static partial class GroceryStoreBuilder
         root.SetParent(parent);
         float half = WalkwayWidth / 2;
 
-        // The gate: a frozen pizza box standing on edge, frosted over.
         float gw = 8.4f, gh = 6f, gd = 1.6f;
         var pizza = LoadModel("k:pizza-box");
         Transform gate;
@@ -297,7 +266,6 @@ static partial class GroceryStoreBuilder
         var lifted = gate.gameObject.AddComponent<LiftedGate>();
         lifted.Setup(0.25f);
 
-        // Ice-block wall either side, sealed to the ceiling, plus a seal above the raised gate.
         for (float wx = x - half; wx < x + half - 0.1f; wx += 4f)
         {
             if (Mathf.Abs(wx + 2f - x) < gw / 2 + 0.5f) continue;
@@ -309,7 +277,6 @@ static partial class GroceryStoreBuilder
         float liftedTop = gh + 7.5f;
         Seal(root, "Seal Above", new Vector3(x, (liftedTop + WallHeight) / 2, wallZ), new Vector3(gw + 0.4f, WallHeight - liftedTop, 3.2f));
 
-        // Lever: a popsicle stick on an ice cream tub, long end under the gate.
         const float nearArm = 8f, farArm = 14f, plankW = 2.4f, thick = 0.3f;
         float tubH = 1.8f;
         var tubPrefab = LoadModel("k:ice-cream-cup");
@@ -330,7 +297,6 @@ static partial class GroceryStoreBuilder
         pivot.gameObject.AddComponent<Seesaw>().Setup(pivot, rest, tipped, farArm, thick, 0f, lifted);
         pivot.rotation = Quaternion.Euler(rest, 0, 0);
 
-        // A carryable ice cube to stand on.
         var step = IceCube(root, new Vector3(x - 9f, 0.95f, pivotZ - 14f), new Vector3(1.9f, 1.9f, 1.9f), bob: 0);
         step.name = "Carry Ice Cube";
         step.isStatic = false;
@@ -340,8 +306,6 @@ static partial class GroceryStoreBuilder
             "The popsicle stick's short end is too high. Carry the ice cube over to stand on, then tip the stick to lift the pizza box.", "E", "SPACE");
     }
 
-    // Tall glass-door freezers along one side of a hall, glowing icy blue inside and stocked with
-    // frozen food. `dir` is the direction the doors face (+1 = +X). The top is flat and walkable.
     static void FreezerWall(Transform parent, float xFront, int dir, float z0, float z1, float depth, System.Random rng)
     {
         var root = new GameObject("Freezer Wall").transform;
@@ -361,7 +325,6 @@ static partial class GroceryStoreBuilder
         Box("Back Glow", root, new Vector3(xFront - dir * (depth - 0.4f), FreezerHeight / 2, zc), new Vector3(0.3f, FreezerHeight, len), glow);
         Box("Base", root, new Vector3(xc, baseH / 2, zc), new Vector3(depth, baseH, len), trim);
         Box("Top", root, new Vector3(xc, FreezerHeight - topH / 2, zc), new Vector3(depth, topH, len), body);
-        // Frosty top surface you walk on.
         var top = GameObject.CreatePrimitive(PrimitiveType.Cube);
         top.name = "Frost Top";
         top.transform.SetParent(root);
@@ -389,7 +352,6 @@ static partial class GroceryStoreBuilder
             Box("Door Frame", root, new Vector3(fx, FreezerHeight / 2, z), new Vector3(0.5f, FreezerHeight, 0.6f), trim);
             if (d == doors) break;
             float zm = z + doorW / 2;
-            // Glass, frost creeping in from the edges, and a chrome handle.
             var pane = GameObject.CreatePrimitive(PrimitiveType.Quad);
             pane.name = "Door Glass";
             pane.transform.SetParent(root);
@@ -418,7 +380,6 @@ static partial class GroceryStoreBuilder
                     FillRowAlongZ(root, products, rng, Rand, z + 0.5f, z + doorW - 0.5f, baseH + k * levelH + 0.13f, levelH - 0.5f, xFront - dir * 0.8f, depth * 0.75f, -dir);
         }
 
-        // Icicles hanging along the front top edge.
         var cone = ConeMesh();
         var ice = IceMaterial();
         for (float z = z0 + 1f; z < z1; z += 1.6f + (float)rng.NextDouble() * 2.5f)
@@ -434,7 +395,6 @@ static partial class GroceryStoreBuilder
         }
     }
 
-    // Packs one shelf along Z (doors face ±X): facings side by side, rows going inward along `inward` X.
     static void FillRowAlongZ(Transform parent, List<ProductType> types, System.Random rng, System.Func<float, float, float> rand,
         float z0, float z1, float y, float room, float xFront, float depth, int inward)
     {
@@ -443,7 +403,7 @@ static partial class GroceryStoreBuilder
         while (z < z1)
         {
             var t = types[rng.Next(types.Count)];
-            var b = t.bounds; // long side along Z at t.yaw
+            var b = t.bounds;
             float s = Mathf.Min(t.size / Mathf.Max(b.x, b.y, b.z), 0.85f * room / b.y, 0.95f * depth / b.x);
             float w = b.z * s, dx = b.x * s;
             if (z + w > z1) break;
@@ -474,7 +434,7 @@ static partial class GroceryStoreBuilder
             for (int x = 0; x < size; x++)
             {
                 float u = x / (float)size, v = y / (float)size;
-                float edge = Mathf.Min(Mathf.Min(u, 1 - u), Mathf.Min(v, 1 - v)) * 2f; // 0 at the frame, 1 in the middle
+                float edge = Mathf.Min(Mathf.Min(u, 1 - u), Mathf.Min(v, 1 - v)) * 2f;
                 float n = Fbm(x / 18f, y / 18f, 41);
                 float crystals = Mathf.Pow(Fbm(x / 5f, y / 5f, 77), 3f);
                 float a = Mathf.Clamp01((0.75f - edge) * 2.2f + (n - 0.5f) * 1.2f) * 0.75f + crystals * 0.25f + (v < 0.25f ? (0.25f - v) * 1.5f : 0);
@@ -497,7 +457,6 @@ static partial class GroceryStoreBuilder
         return mat;
     }
 
-    // A unit cone (base radius 0.5 at y=0, tip at y=1), saved as an asset for reuse.
     public static Mesh ConeMesh()
     {
         const string path = "Assets/Models/Cone.asset";
@@ -528,7 +487,6 @@ static partial class GroceryStoreBuilder
         return mesh;
     }
 
-    // Soft round particle texture + material, for snow and sparkles.
     static Material ParticleMaterial(string name, Color color)
     {
         const string texPath = MatFolder + "/SoftDot.png";

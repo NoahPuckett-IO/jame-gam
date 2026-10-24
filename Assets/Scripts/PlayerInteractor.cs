@@ -2,9 +2,6 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-// Lets the player pick up a nearby Carryable with Interact (E) and put it down in front of them.
-// Henry bends down for both; the item attaches (or lets go) partway through the motion, and he
-// carries it in both arms in front of his chest.
 [RequireComponent(typeof(PlayerController))]
 public class PlayerInteractor : MonoBehaviour
 {
@@ -38,7 +35,6 @@ public class PlayerInteractor : MonoBehaviour
             return;
         }
 
-        // Nearest carryable in reach, roughly in front of the player.
         Carryable best = null;
         float bestScore = float.MaxValue;
         foreach (var c in FindObjectsByType<Carryable>())
@@ -57,7 +53,6 @@ public class PlayerInteractor : MonoBehaviour
     IEnumerator PickUp(Carryable item)
     {
         busy = true;
-        // Turn to face it, then bend down and lift.
         var to = item.transform.position - transform.position;
         to.y = 0;
         if (to.sqrMagnitude > 0.01f) transform.rotation = Quaternion.LookRotation(to);
@@ -79,9 +74,6 @@ public class PlayerInteractor : MonoBehaviour
         busy = false;
     }
 
-    // The carried item rides out in front of Henry's chest, its back face just clear of his body
-    // and its bottom above his feet, so it never sinks into him; CarryIK puts his hands on its
-    // sides. Right after the grab it glides up from where it lay instead of popping into place.
     void LateUpdate()
     {
         if (held == null) return;
@@ -90,7 +82,7 @@ public class PlayerInteractor : MonoBehaviour
         if (chest != null) chestY = chest.position.y;
         float feet = transform.position.y - 1f;
         var center = transform.position + transform.forward * (BodyRadius + heldSize.z * 0.5f);
-        center.y = Mathf.Max(chestY + 0.15f, feet + heldSize.y * 0.5f + 0.3f); // hugged at chest height
+        center.y = Mathf.Max(chestY + 0.15f, feet + heldSize.y * 0.5f + 0.3f);
 
         var rot = transform.rotation;
         var pos = center - rot * heldCenterOffset;

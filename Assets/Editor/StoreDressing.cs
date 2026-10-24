@@ -3,8 +3,6 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
-// Store dressing for GroceryStoreBuilder: glowing refrigerated coolers along the end walls,
-// backlit signs, a drop ceiling, and endcap displays at the open end of each aisle.
 static partial class GroceryStoreBuilder
 {
     const float CoolerDepth = 0.85f * Scale;
@@ -27,9 +25,6 @@ static partial class GroceryStoreBuilder
         stock.Select(s => (prefab: LoadModel(s.model), s.size)).Where(t => t.prefab != null)
             .Select(t => MeasureProduct(t.prefab, t.size)).ToList();
 
-    // ---------- Text & signs ----------
-
-    // One material per font: SignText points the material at its font's atlas texture.
     static Material SignTextMaterial(Font font)
     {
         string path = $"{MatFolder}/SignText_{font.name}.mat";
@@ -47,7 +42,6 @@ static partial class GroceryStoreBuilder
 
     static Font IconFont() => AssetDatabase.LoadAssetAtPath<Font>("Assets/Fonts/MaterialIcons-Regular.ttf");
 
-    // Material Icons glyphs used on signs (codepoints from MaterialIcons-Regular.codepoints).
     static readonly Dictionary<string, int> Icons = new Dictionary<string, int>
     {
         ["bakery"] = 0xea53, ["breakfast"] = 0xea54, ["cake"] = 0xe7e9, ["coffee"] = 0xe541, ["cookie"] = 0xeaac,
@@ -68,8 +62,6 @@ static partial class GroceryStoreBuilder
         MakeText(parent, pos, yaw, ((char)code).ToString(), size, size, color, font);
     }
 
-    // Depth-tested 3D text, sized to fit inside maxWidth × maxHeight. Yaw 0 reads correctly when
-    // looking along +Z.
     static void MakeText(Transform parent, Vector3 pos, float yaw, string text, float maxWidth, float maxHeight, Color color, Font font = null)
     {
         const int fontSize = 96;
@@ -89,8 +81,6 @@ static partial class GroceryStoreBuilder
         t.GetComponent<MeshRenderer>().sharedMaterial = SignTextMaterial(font);
         t.gameObject.AddComponent<SignText>();
 
-        // Size of the text at characterSize 1, from the font's glyph metrics. TextMesh draws
-        // 1 font pixel as 0.1 units × characterSize.
         var lines = text.Split('\n');
         font.RequestCharactersInTexture(text, fontSize);
         float widest = 0;
@@ -107,10 +97,6 @@ static partial class GroceryStoreBuilder
             t.characterSize = Mathf.Min(maxWidth / textW, maxHeight / textH);
     }
 
-    // A glowing lightbox sign, laid out like real store signage: colored panel in a dark frame,
-    // light accent stripes top and bottom, optional icons either side of the title, an optional
-    // subtitle line and an optional yellow price "burst". `normal` is the direction the readable
-    // face points (±X or ±Z).
     static void BacklitSign(Transform parent, Vector3 center, Vector3 normal, float width, float height, string text, Color color,
         bool twoSided = false, string subtitle = null, string iconLeft = null, string iconRight = null, string badge = null)
     {
@@ -118,23 +104,23 @@ static partial class GroceryStoreBuilder
         sign.SetParent(parent);
         sign.position = center;
 
-        bool alongX = Mathf.Abs(normal.z) > 0.5f; // panel spans X when it faces ±Z
+        bool alongX = Mathf.Abs(normal.z) > 0.5f;
         float thick = 0.06f * Scale;
         Vector3 Size(float w, float h, float d) => alongX ? new Vector3(w, h, d) : new Vector3(d, h, w);
 
         Box("Frame", sign, center, Size(width + 0.06f * Scale, height + 0.06f * Scale, thick), GetMaterial("SignFrame", new Color(0.08f, 0.08f, 0.09f)));
-        var glow = StoreAtmosphere.Emissive($"SignGlow_{ColorUtility.ToHtmlStringRGB(color)}", color, 0.95f); // dim enough that white text reads on it
+        var glow = StoreAtmosphere.Emissive($"SignGlow_{ColorUtility.ToHtmlStringRGB(color)}", color, 0.95f);
         var stripe = StoreAtmosphere.Emissive("SignStripe", new Color(1f, 0.97f, 0.9f), 1.1f);
         var dark = Color.Lerp(color, Color.black, 0.55f);
         var stripeDark = StoreAtmosphere.Emissive($"SignGlow_{ColorUtility.ToHtmlStringRGB(dark)}", dark, 0.8f);
         var iconColor = Color.Lerp(Color.white, color, 0.15f);
-        bool small = width < 0.8f * Scale; // tiny signs (lane numbers) stay plain
+        bool small = width < 0.8f * Scale;
 
         foreach (var n in twoSided ? new[] { normal, -normal } : new[] { normal })
         {
             var face = center + n * (thick / 2 + 0.005f * Scale);
-            var right = Vector3.Cross(Vector3.up, -n).normalized; // viewer's right
-            float yaw = Mathf.Atan2(-n.x, -n.z) * Mathf.Rad2Deg;   // text reads from the `n` side
+            var right = Vector3.Cross(Vector3.up, -n).normalized;
+            float yaw = Mathf.Atan2(-n.x, -n.z) * Mathf.Rad2Deg;
             Vector3 Front(float u, float v, float lift) => face + right * u + Vector3.up * v + n * lift * Scale;
 
             Box("Panel", sign, face, Size(width, height, 0.01f * Scale), glow);
@@ -166,7 +152,6 @@ static partial class GroceryStoreBuilder
 
             if (badge != null)
             {
-                // Price burst: a yellow disc overlapping the top-right corner.
                 float r = height * 0.34f;
                 var disc = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                 disc.name = "Badge";
@@ -181,8 +166,6 @@ static partial class GroceryStoreBuilder
         }
     }
 
-    // ---------- Drop ceiling ----------
-
     static Material CeilingTiles(float width, float depth)
     {
         const string texPath = MatFolder + "/CeilingTiles.png";
@@ -194,7 +177,6 @@ static partial class GroceryStoreBuilder
             for (int y = 0; y < size; y++)
             for (int x = 0; x < size; x++)
             {
-                // Fissured mineral-fibre tiles in a dark metal T-grid.
                 float n = 0.74f + 0.05f * (float)rng.NextDouble() - ((float)rng.NextDouble() > 0.96f ? 0.12f : 0f);
                 var c = new Color(n, n, n * 0.98f);
                 int gx = x % half, gy = y % half;
@@ -207,17 +189,13 @@ static partial class GroceryStoreBuilder
         }
         var mat = GetMaterial("CeilingTiles", Color.white);
         mat.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(texPath));
-        float tile = 0.6f * Scale; // 60 cm tiles, 2×2 per texture
+        float tile = 0.6f * Scale;
         mat.SetTextureScale("_BaseMap", new Vector2(width / (2 * tile), depth / (2 * tile)));
         mat.SetFloat("_Smoothness", 0.1f);
         EditorUtility.SetDirty(mat);
         return mat;
     }
 
-    // ---------- Coolers ----------
-
-    // A run of glass-door coolers against a wall, glowing from inside and packed with stock.
-    // `dir` = +1 for a wall at +Z (coolers face -Z), -1 for a wall at -Z.
     static void BuildCoolerRun(Transform parent, float x0, float x1, float wallZ, int dir,
         (string model, float size)[] stock, string label, Color signColor, int seed)
     {
@@ -285,9 +263,6 @@ static partial class GroceryStoreBuilder
         }
     }
 
-    // Packs one shelf that runs along X: facings side by side, 1–4 rows deep going towards +dir Z.
-    // Packs one shelf that runs along X: facings side by side, 1–5 rows deep going towards +dir Z,
-    // and, when `maxStack` > 1 and there's headroom, small items stacked up to that many high.
     static void FillRowAlongX(Transform parent, List<ProductType> types, System.Random rng, System.Func<float, float, float> rand,
         float x0, float x1, float y, float room, float zFront, float depth, int dir, int maxStack = 1)
     {
@@ -296,7 +271,7 @@ static partial class GroceryStoreBuilder
         while (x < x1)
         {
             var t = types[rng.Next(types.Count)];
-            var b = t.bounds; // long side along Z at t.yaw; turned 90° below so it runs along X
+            var b = t.bounds;
             float s = Mathf.Min(t.size / Mathf.Max(b.x, b.y, b.z), 0.85f * room / b.y, 0.95f * depth / b.x);
             float w = b.z * s, dz = b.x * s, h = b.y * s;
             if (x + w > x1) break;
@@ -318,9 +293,6 @@ static partial class GroceryStoreBuilder
         }
     }
 
-    // ---------- Endcaps & displays ----------
-
-    // Stack of boxes with an open box on top filled with one product, like a promo bin.
     static void DisplayBin(Transform parent, Vector3 at, List<ProductType> types, System.Random rng, int stackHeight)
     {
         var closed = LoadKenney("cardboardBoxClosed");
@@ -337,7 +309,6 @@ static partial class GroceryStoreBuilder
             y = bb.max.y;
             if (h < stackHeight - 1) continue;
 
-            // Heap of product in the open box: a packed layer sunk into the box, a smaller layer on top.
             var t = types[rng.Next(types.Count)];
             float inner = bb.size.x * 0.8f;
             float s = Mathf.Min(t.size / Mathf.Max(t.bounds.x, t.bounds.y, t.bounds.z), inner / 2.2f / Mathf.Max(t.bounds.x, t.bounds.z));
@@ -355,7 +326,6 @@ static partial class GroceryStoreBuilder
         }
     }
 
-    // Promo bins against the open end of every aisle (the end without a blockade).
     static void BuildEndcaps(Transform store, List<Transform> aisles, ShelfInfo shelf, float aisleLength)
     {
         var root = new GameObject("Endcaps").transform;
@@ -375,7 +345,6 @@ static partial class GroceryStoreBuilder
 
     static GameObject LoadFurniture(string name) => LoadKenney(name);
 
-    // Puts `count` products on whatever upward surface `target` has near (x, z), e.g. a counter top.
     static void SetOnTop(GameObject target, Transform parent, List<ProductType> types, System.Random rng, Vector3 around, float spread, int count)
     {
         var up = UpwardTriangles(target);
@@ -392,27 +361,23 @@ static partial class GroceryStoreBuilder
         }
     }
 
-    // Fills every board of a piece of furniture (a rack, a bookcase) with products along X.
     static void StockFurniture(GameObject rack, Transform parent, List<ProductType> types, System.Random rng)
     {
         float Rand(float a, float b) => a + (float)rng.NextDouble() * (b - a);
         var b = GetBounds(rack);
         var up = UpwardTriangles(rack);
-        // Sample a few spots so a center divider doesn't hide the boards.
         var levels = new List<float>();
         foreach (float fx in new[] { 0.25f, 0.5f, 0.75f })
             foreach (float y in SurfacesAt(up, b.min.x + fx * b.size.x, b.center.z))
                 if (!levels.Any(l => Mathf.Abs(l - y) < 0.02f * Scale)) levels.Add(y);
         levels.Sort();
         if (levels.Count == 0) return;
-        levels.Add(levels[levels.Count - 1] + 0.3f * Scale); // the top surface gets a short pile too
+        levels.Add(levels[levels.Count - 1] + 0.3f * Scale);
         for (int i = 0; i < levels.Count - 1; i++)
             FillRowAlongX(parent, types, rng, Rand, b.min.x + 0.02f * Scale, b.max.x - 0.02f * Scale,
                 levels[i], levels[i + 1] - levels[i] - 0.015f * Scale, b.min.z + 0.015f * Scale, b.size.z * 0.9f, +1, maxStack: 3);
     }
 
-    // Big lightbox menu board like the ones over a deli counter: a title across the top and a row of
-    // real products standing on a ledge underneath, lit by the panel.
     static void MenuBoard(Transform parent, Vector3 center, Vector3 normal, float width, float height, string title, Color color, List<ProductType> items, System.Random rng,
         string subtitle = null, string iconLeft = null, string iconRight = null, string badge = null)
     {
@@ -424,7 +389,6 @@ static partial class GroceryStoreBuilder
         Vector3 Span(float w, float h, float d) => alongX ? new Vector3(w, h, d) : new Vector3(d, h, w);
         Vector3 along = alongX ? Vector3.right : Vector3.forward;
 
-        // Back panel for the product row and a ledge for them to stand on.
         Vector3 lowCenter = center - Vector3.up * height * 0.23f;
         Box("Menu Panel", parent, lowCenter, Span(width, height * 0.5f, 0.04f * Scale), tint);
         float ledgeY = lowCenter.y - height * 0.25f;
@@ -443,8 +407,6 @@ static partial class GroceryStoreBuilder
         }
     }
 
-    // The store front: lane furniture, impulse racks, bags and groceries on the belts, plants,
-    // bins, a doormat, a bench, big menu boards and posters.
     static void DressCheckout(Transform store, float left, float right, float depth)
     {
         var root = new GameObject("Checkout Displays").transform;
@@ -459,8 +421,6 @@ static partial class GroceryStoreBuilder
         var bagTypes = Measure(new[] { ("k:bag", 0.45f) });
         var pole = GetMaterial("SignFrame", new Color(0.08f, 0.08f, 0.09f));
 
-        // Each lane: candy rack at its entrance, lane light on the counter end, groceries on the belt,
-        // a couple of filled bags at the bagging end.
         var rack = LoadFurniture("bookcaseOpenLow");
         int lane = 1;
         foreach (var counter in checkoutCounters)
@@ -468,13 +428,11 @@ static partial class GroceryStoreBuilder
             var b = GetBounds(counter);
             if (rack != null)
             {
-                // Candy rack at the lane entrance, drinks rack at the bagging end.
                 var r = PlaceProp(rack, root, 1.2f, 1.1f, alongX: true, new Vector3(b.max.x + 0.75f * Scale, 0, b.center.z));
                 StockFurniture(r, root, snacks, rng);
                 var r2 = PlaceProp(rack, root, 1.2f, 1.1f, alongX: true, new Vector3(b.min.x - 0.75f * Scale, 0, b.center.z));
                 StockFurniture(r2, root, drinks.Concat(snacks).ToList(), rng);
             }
-            // Gum and candy piled by the register.
             if (snacks.Count > 0) SetOnTop(counter, root, snacks, rng, new Vector3(b.max.x - b.size.x * 0.12f, 0, b.center.z), b.size.x * 0.12f, rng.Next(4, 8));
             float poleH = Mathf.Max(CoolerHeight * 0.85f, b.max.y + 0.8f * Scale);
             var poleAt = new Vector3(b.max.x - 0.08f * Scale, b.max.y, b.center.z);
@@ -489,13 +447,11 @@ static partial class GroceryStoreBuilder
         BacklitSign(root, new Vector3(laneX, WallHeight - 1.2f * Scale, 0), Vector3.right, 4.4f * Scale, 0.7f * Scale, "CHECKOUT", new Color(0.85f, 0.15f, 0.12f),
             twoSided: true, subtitle: "THANK YOU FOR SHOPPING", iconLeft: "cart", iconRight: "grocery");
 
-        // Produce bins north of the door, snack bins at the ends of the lane block.
         for (int i = 0; i < 3; i++)
             DisplayBin(root, new Vector3(left + CheckoutWidth * 0.25f, 0, (1.0f + i * 0.6f) * Scale + DoorWidth / 2), produce, rng, 1);
         foreach (float z in new[] { -7f, 7f })
             DisplayBin(root, new Vector3(left + CheckoutWidth * 0.75f, 0, z * Scale), snacks, rng, 2);
 
-        // Furniture around the door.
         void Prop(string name, float height, float maxLen, bool alongX, Vector3 at)
         {
             var prefab = LoadFurniture(name);
@@ -510,7 +466,6 @@ static partial class GroceryStoreBuilder
         Prop("plantSmall2", 0.8f, 0.6f, alongX: true, new Vector3(left + CheckoutWidth * 0.95f, 0, 6.2f * Scale));
         Prop("plantSmall1", 0.8f, 0.6f, alongX: true, new Vector3(left + CheckoutWidth * 0.95f, 0, -6.8f * Scale));
 
-        // Menu boards: deli/bakery over the door, drinks and frozen high on the end walls.
         var bakery = Measure(new[] { ("Bread", 0.28f), ("k:croissant", 0.14f), ("k:cake", 0.25f), ("coffee", 0.18f), ("k:donut-chocolate", 0.1f), ("k:pie", 0.25f) });
         MenuBoard(root, new Vector3(left + 0.08f * Scale, DoorHeight + 0.85f * Scale, 0), Vector3.right, 6f * Scale, 1.4f * Scale,
             "BAKERY  •  DELI  •  COFFEE", new Color(0.9f, 0.5f, 0.1f), bakery, rng,
@@ -523,7 +478,6 @@ static partial class GroceryStoreBuilder
             "FROZEN TREATS", new Color(0.85f, 0.12f, 0.2f), Measure(CoolerFrozen), rng,
             subtitle: "ICE CREAM  •  PIZZA  •  MEAT", iconLeft: "icecream", iconRight: "pizza", badge: "SALE");
 
-        // Promo posters on the east wall, under the FRESH MARKET sign.
         var posters = new[]
         {
             (title: "FRESH BREAD", sub: "BAKED EVERY MORNING", icon: "bakery", badge: "$1.99", color: new Color(0.9f, 0.45f, 0.08f)),
@@ -532,7 +486,7 @@ static partial class GroceryStoreBuilder
             (title: "FRESH PRODUCE", sub: "FROM LOCAL FARMS", icon: "apple", badge: "SALE", color: new Color(0.15f, 0.6f, 0.25f)),
         };
         for (int i = 0; i < posters.Length; i++)
-            BacklitSign(root, new Vector3(right - 0.05f * Scale, 2.45f * Scale, (-5.4f + i * 3.6f) * Scale), Vector3.left, // above the wall shelf
+            BacklitSign(root, new Vector3(right - 0.05f * Scale, 2.45f * Scale, (-5.4f + i * 3.6f) * Scale), Vector3.left,
                 2.6f * Scale, 1f * Scale, posters[i].title, posters[i].color,
                 subtitle: posters[i].sub, iconLeft: posters[i].icon, badge: posters[i].badge);
     }

@@ -2,7 +2,6 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
-// Full-screen black fade used by cutscenes and respawns.
 public class ScreenFader : MonoBehaviour
 {
     [SerializeField] Image image;

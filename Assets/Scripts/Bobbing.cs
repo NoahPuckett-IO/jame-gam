@@ -1,6 +1,5 @@
 using UnityEngine;
 
-// Gentle up-and-down drift (and an optional slow spin) for floating platforms like ice cubes.
 public class Bobbing : MonoBehaviour
 {
     [SerializeField] float amplitude = 0.25f, period = 3f, spin;

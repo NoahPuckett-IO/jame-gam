@@ -1,13 +1,12 @@
 using UnityEngine;
 
-// The game's looping soundtrack. It plays only while the player is actually in control: it fades
-// out and pauses for the title menu and for every cutscene (the intro, the corner walks), then
-// fades back in and carries on from where it stopped.
 [RequireComponent(typeof(AudioSource))]
 public class GameMusic : MonoBehaviour
 {
-    [SerializeField] float volume = 0.55f;
+    [SerializeField] float volume = 0.45f;
     [SerializeField] float fadeSeconds = 1.2f;
+
+    public static bool KeepPlaying;
 
     AudioSource source;
     PlayerController player;
@@ -29,7 +28,7 @@ public class GameMusic : MonoBehaviour
 
     void Update()
     {
-        bool playing = player != null && player.enabled && !player.InCutscene && !player.CameraLocked
+        bool playing = KeepPlaying || player != null && player.enabled && !player.InCutscene && !player.CameraLocked
                        && (intro == null || !intro.Running);
         float target = playing ? volume : 0f;
         source.volume = Mathf.MoveTowards(source.volume, target, volume / fadeSeconds * Time.unscaledDeltaTime);

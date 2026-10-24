@@ -3,14 +3,6 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
-// The opening cutscene, played when the player presses Play:
-//   1. Night woods: Henry strolls along a path, stops, and looks up as a classic flying saucer
-//      drifts down over the trees.
-//   2. A tractor beam snaps on; Henry flails as he's sucked up into the ship, which zips away.
-//   3. Inside the ship an alien levels a ray gun at him: zap, and he shrinks to nothing. Fade out.
-//   4. In the store, Henry (now tiny) wakes up inside a cereal box lying on its side, crawls out,
-//      stands up and looks around, and the player takes over.
-// Space or Escape skips straight to step 4's ending.
 public class IntroCutscene : MonoBehaviour
 {
     [Header("Woods")]
@@ -24,9 +16,6 @@ public class IntroCutscene : MonoBehaviour
     [SerializeField] PlayerController player;
     [SerializeField] Transform boxInside, boxOutside, storeSpawn;
     [SerializeField] Text skipHint;
-
-    // Ground speed that matches the walk cycle at WalkAnimSpeed (units/second at Henry's 2-unit size).
-    const float WalkPace = 2.1f, WalkAnimSpeed = 1.2f;
 
     Camera cam;
     bool skipping, running;
@@ -57,8 +46,6 @@ public class IntroCutscene : MonoBehaviour
             StartCoroutine(Finish(true));
         }
     }
-
-    // ---------- helpers ----------
 
     void CamTo(Transform at)
     {
@@ -92,8 +79,6 @@ public class IntroCutscene : MonoBehaviour
         hl.weight = weight;
     }
 
-    // ---------- sequence ----------
-
     IEnumerator Sequence()
     {
         if (skipHint != null) skipHint.gameObject.SetActive(true);
@@ -104,7 +89,6 @@ public class IntroCutscene : MonoBehaviour
         player.Teleport(boxInside.position, boxInside.rotation);
         playerAnim?.Play("Sit", 0f);
 
-        // 1. The woods.
         woodsHenry.gameObject.SetActive(true);
         woodsHenry.transform.SetPositionAndRotation(pathStart.position, pathStart.rotation);
         woodsHenry.SetFloat("Speed", 4f);
@@ -113,26 +97,31 @@ public class IntroCutscene : MonoBehaviour
         CamTo(camWalk);
         StartCoroutine(Fade(0f, 1.5f));
 
-        // Stroll along the path with the camera tracking alongside. He moves at the walk cycle's own
-        // pace (sped up a touch) so his feet stay planted, easing to a stop at the end.
         var camOffset = camWalk.position - pathStart.position;
+        var dir = (pathStop.position - pathStart.position).normalized;
         float pathLen = Vector3.Distance(pathStart.position, pathStop.position);
-        float walk = pathLen / WalkPace;
-        woodsHenry.speed = WalkAnimSpeed;
-        for (float t = 0; t < walk; t += Time.deltaTime)
+        var footL = woodsHenry.GetBoneTransform(HumanBodyBones.LeftFoot);
+        var footR = woodsHenry.GetBoneTransform(HumanBodyBones.RightFoot);
+        var root = woodsHenry.transform;
+        Vector3 prevL = footL.position - root.position, prevR = footR.position - root.position;
+        float walked = 0f;
+        for (float t = 0; walked < pathLen && t < 15f; t += Time.deltaTime)
         {
-            float k = t / walk;
-            woodsHenry.transform.position = Vector3.Lerp(pathStart.position, pathStop.position, k);
-            cam.transform.position = woodsHenry.transform.position + camOffset;
-            cam.transform.rotation = Quaternion.LookRotation(woodsHenry.transform.position + Vector3.up * 1.4f - cam.transform.position);
-            // The saucer drifts in over the trees during the walk.
-            ufo.position = Vector3.Lerp(ufo.position, ufoHover.position, Time.deltaTime * 0.6f);
             yield return null;
+            var l = footL.position - root.position;
+            var r = footR.position - root.position;
+            float step = Vector3.Dot(footL.position.y < footR.position.y ? prevL - l : prevR - r, dir);
+            prevL = l;
+            prevR = r;
+            if (step > 0f && step < 0.5f) walked = Mathf.Min(pathLen, walked + step);
+            else if (t > 1.5f && step <= 0f) walked = Mathf.Min(pathLen, walked + 0.2f * Time.deltaTime);
+            root.position = pathStart.position + dir * walked;
+            cam.transform.position = root.position + camOffset;
+            cam.transform.rotation = Quaternion.LookRotation(root.position + Vector3.up * 1.4f - cam.transform.position);
+            ufo.position = Vector3.Lerp(ufo.position, ufoHover.position, Time.deltaTime * 0.6f);
         }
         woodsHenry.SetFloat("Speed", 0f);
-        woodsHenry.speed = 1f;
 
-        // He stops and looks up.
         HenryLook(woodsHenry, ufo, 0f);
         for (float t = 0; t < 1.2f; t += Time.deltaTime)
         {
@@ -143,7 +132,6 @@ public class IntroCutscene : MonoBehaviour
         yield return CamMove(cam.transform, camLookUp, 1.6f, ufo);
         yield return new WaitForSeconds(0.6f);
 
-        // 2. Tractor beam.
         beam.gameObject.SetActive(true);
         beam.localScale = new Vector3(0.05f, 1f, 0.05f);
         for (float t = 0; t < 0.4f; t += Time.deltaTime)
@@ -172,7 +160,6 @@ public class IntroCutscene : MonoBehaviour
         }
         woodsHenry.gameObject.SetActive(false);
         beam.gameObject.SetActive(false);
-        // The saucer zips away.
         var away = ufo.position + ufoHover.right * -150f + Vector3.up * 60f;
         var ufoStart = ufo.position;
         for (float t = 0; t < 1f; t += Time.deltaTime)
@@ -183,7 +170,6 @@ public class IntroCutscene : MonoBehaviour
         }
         yield return Fade(1f, 0.5f);
 
-        // 3. Inside the ship.
         woodsHenry.gameObject.SetActive(true);
         woodsHenry.transform.localScale = Vector3.one;
         woodsHenry.transform.SetPositionAndRotation(shipHenrySpot.position, shipHenrySpot.rotation);
@@ -196,7 +182,6 @@ public class IntroCutscene : MonoBehaviour
         if (zapLight != null) zapLight.enabled = false;
         yield return Fade(0f, 0.6f);
         yield return new WaitForSeconds(0.7f);
-        // The alien raises the ray gun.
         for (float t = 0; t < 1.2f; t += Time.deltaTime)
         {
             gun.localRotation = Quaternion.Slerp(gunRest * Quaternion.Euler(50, 0, 0), gunRest, Mathf.SmoothStep(0, 1, t / 1.2f));
@@ -204,7 +189,6 @@ public class IntroCutscene : MonoBehaviour
         }
         gun.localRotation = gunRest;
         yield return new WaitForSeconds(0.9f);
-        // ZAP.
         zap.enabled = true;
         if (zapLight != null) zapLight.enabled = true;
         woodsHenry.CrossFadeInFixedTime("Hit", 0.05f);
@@ -227,7 +211,6 @@ public class IntroCutscene : MonoBehaviour
         woodsHenry.gameObject.SetActive(false);
         yield return new WaitForSeconds(1f);
 
-        // 4. The store. Henry wakes up inside a cereal box.
         yield return Finish(false);
     }
 
@@ -245,7 +228,6 @@ public class IntroCutscene : MonoBehaviour
         player.Teleport(boxInside.position, boxInside.rotation);
         player.BeginCutscene();
         player.CameraLocked = false;
-        // His fill lights would glare off the cardboard right next to him; bring them up once he's out.
         foreach (var l in lights) l.intensity = 0f;
         float yaw = boxInside.eulerAngles.y;
         player.SetLook(yaw, 12f);
@@ -257,7 +239,6 @@ public class IntroCutscene : MonoBehaviour
             yield return new WaitForSeconds(0.6f);
             playerAnim?.Play("WakeUp", 0.3f);
             yield return new WaitForSeconds(1.2f);
-            // Crawl out of the box.
             playerAnim?.Play("Crawl", 0.3f);
             var to = boxOutside.position - player.transform.position;
             to.y = 0;
@@ -268,7 +249,6 @@ public class IntroCutscene : MonoBehaviour
                 yield return null;
             }
             player.ScriptedMove(Vector3.zero);
-            // Stand up and look around at the enormous store.
             playerAnim?.Play("LookAround", 0.4f);
             var look = player.GetComponentInChildren<HeadLook>();
             if (look != null) look.target = null;

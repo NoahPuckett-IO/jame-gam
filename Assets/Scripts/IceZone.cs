@@ -1,6 +1,5 @@
 using UnityEngine;
 
-// While Henry is inside this volume the ground is ice: he keeps sliding and turns slowly.
 [RequireComponent(typeof(Collider))]
 public class IceZone : MonoBehaviour
 {

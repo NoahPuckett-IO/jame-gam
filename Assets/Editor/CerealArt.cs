@@ -1,11 +1,6 @@
 using UnityEditor;
 using UnityEngine;
 
-// Painted box art for the cereal boxes, generated once per brand as PNGs:
-//   front: brand-colored background with a sunburst, a bowl of cereal with milk splashes, loose
-//          pieces tumbling around it, a "NEW!" burst and a logo panel (the brand name itself is
-//          laid on top as crisp 3D text by the builder);
-//   side:  a nutrition facts panel and a barcode on the brand color.
 static class CerealArt
 {
     const string Folder = "Assets/Materials/CerealArt";
@@ -44,8 +39,6 @@ static class CerealArt
         return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
     }
 
-    // ---------- Painting helpers (simple software rasterizer on a Color[] canvas) ----------
-
     class Canvas
     {
         public readonly int w, h;
@@ -59,7 +52,6 @@ static class CerealArt
             px[i] = Color.Lerp(px[i], new Color(c.r, c.g, c.b, 1), c.a);
         }
 
-        // Anti-aliased filled ellipse.
         public void Ellipse(float cx, float cy, float rx, float ry, Color c, float rot = 0)
         {
             float cs = Mathf.Cos(rot), sn = Mathf.Sin(rot);
@@ -153,7 +145,6 @@ static class CerealArt
         var rng = new System.Random(seed * 97 + 3);
         float R(float a, float bb) => a + (float)rng.NextDouble() * (bb - a);
 
-        // Background: vertical gradient + sunburst from behind the bowl.
         Vector2 sun = new Vector2(W * 0.5f, H * 0.38f);
         for (int y = 0; y < H; y++)
         for (int x = 0; x < W; x++)
@@ -167,43 +158,36 @@ static class CerealArt
             c.px[y * W + x] = bg;
         }
 
-        // Logo panel near the top (brand text goes on top in 3D).
         c.Rect(36, H - 250, W - 36, H - 40, new Color(0, 0, 0, 0.25f), 46);
         c.Rect(28, H - 240, W - 44, H - 48, b.accent, 44);
         c.Rect(40, H - 228, W - 56, H - 60, Color.Lerp(b.accent, Color.white, 0.25f), 36);
 
-        // Bowl with milk and a heap of cereal.
         float bx = W * 0.5f, by = H * 0.3f;
-        c.Ellipse(bx, by - 120, 200, 40, new Color(0, 0, 0, 0.35f)); // shadow
+        c.Ellipse(bx, by - 120, 200, 40, new Color(0, 0, 0, 0.35f));
         for (int y = 0; y < 150; y++)
         {
             float k = y / 150f;
             float half = Mathf.Lerp(120, 190, Mathf.Sqrt(k));
             c.Rect(bx - half, by - 110 + y, bx + half, by - 109 + y, Color.Lerp(new Color(0.15f, 0.35f, 0.75f), new Color(0.35f, 0.6f, 0.95f), k));
         }
-        c.Ellipse(bx, by + 40, 190, 44, new Color(0.95f, 0.97f, 1f)); // milk surface
+        c.Ellipse(bx, by + 40, 190, 44, new Color(0.95f, 0.97f, 1f));
         for (int i = 0; i < 70; i++)
         {
             float a = R(0, Mathf.PI * 2), rr = Mathf.Sqrt(R(0, 1));
             float px = bx + Mathf.Cos(a) * 160 * rr, py = by + 40 + Mathf.Sin(a) * 34 * rr + R(0, 70) * (1 - rr);
             Piece_(c, b.piece, px, py, R(16, 24), Color.Lerp(b.pieceColor, Color.white, R(0, 0.15f)), R(0, 6.3f));
         }
-        // Milk splash drops.
         for (int i = 0; i < 9; i++)
             c.Ellipse(bx + R(-210, 210), by + R(70, 150), R(6, 14), R(8, 18), new Color(0.97f, 0.98f, 1f, 0.95f));
-        // Pieces tumbling through the air.
         for (int i = 0; i < 9; i++)
             Piece_(c, b.piece, R(40, W - 40), R(by + 100, H - 270), R(18, 30), b.pieceColor, R(0, 6.3f));
 
-        // "NEW!" burst and a bottom band.
         c.Star(W - 90, H - 300, 70, 14, new Color(1f, 0.9f, 0.15f));
         c.Star(W - 90, H - 300, 58, 14, new Color(0.95f, 0.2f, 0.15f));
         c.Rect(0, 0, W, 54, new Color(0, 0, 0, 0.35f));
         return c.ToTexture();
     }
 
-    // The other narrow side: an ingredients block, a "made with whole grain" ribbon, a little bowl
-    // and a recycling mark. No barcode (that's only on the nutrition side).
     static Texture2D PaintSideB(Brand b, int seed)
     {
         const int W = 256, H = 720;
@@ -211,10 +195,8 @@ static class CerealArt
         for (int y = 0; y < H; y++)
         for (int x = 0; x < W; x++)
             c.px[y * W + x] = Color.Lerp(b.deep, b.main, y / (float)H);
-        // Ribbon near the top.
         c.Rect(0, H - 150, W, H - 90, b.accent);
         c.Rect(0, H - 146, W, H - 94, Color.Lerp(b.accent, Color.white, 0.2f));
-        // Bowl illustration.
         c.Ellipse(W / 2f, H - 260, 90, 22, new Color(0.95f, 0.97f, 1f));
         for (int y = 0; y < 70; y++)
         {
@@ -224,7 +206,6 @@ static class CerealArt
         var rng = new System.Random(seed + 7);
         for (int i = 0; i < 14; i++)
             Piece_(c, b.piece, W / 2f + (float)(rng.NextDouble() - 0.5) * 140, H - 262 + (float)(rng.NextDouble() - 0.5) * 18, 9, b.pieceColor, (float)rng.NextDouble() * 6);
-        // Ingredients block: a pale panel of "text" lines of varying length.
         c.Rect(18, 140, W - 18, H - 370, new Color(1, 1, 1, 0.9f), 10);
         for (int i = 0; i < 14; i++)
         {
@@ -232,7 +213,6 @@ static class CerealArt
             float len = 60 + (float)rng.NextDouble() * (W - 110);
             c.Rect(30, y, 30 + len, y + 6, new Color(0.25f, 0.25f, 0.25f));
         }
-        // Recycling mark: three chasing dots in a ring.
         for (int i = 0; i < 3; i++)
         {
             float a = i * Mathf.PI * 2 / 3;
@@ -242,7 +222,6 @@ static class CerealArt
         return c.ToTexture();
     }
 
-    // Top and bottom flaps: brand color, a darker seam down the middle and a pull tab.
     static Texture2D PaintTop(Brand b)
     {
         const int W = 256, H = 128;
@@ -255,7 +234,6 @@ static class CerealArt
         return c.ToTexture();
     }
 
-    // Plain brown inside-of-a-box cardboard: faint corrugation lines and fibers.
     static Texture2D PaintCardboard()
     {
         const int W = 256, H = 256;
@@ -285,7 +263,6 @@ static class CerealArt
         const int W = 256, H = 720;
         var c = new Canvas(W, H);
         for (int i = 0; i < c.px.Length; i++) c.px[i] = b.main;
-        // Nutrition panel.
         c.Rect(20, 240, W - 20, H - 60, Color.white, 8);
         c.Rect(30, H - 120, W - 30, H - 112, Color.black);
         for (int i = 0; i < 18; i++)
@@ -295,7 +272,6 @@ static class CerealArt
             c.Rect(W - 70, y, W - 34, y + 7, new Color(0.15f, 0.15f, 0.15f));
             c.Rect(30, y - 5, W - 30, y - 4, new Color(0.7f, 0.7f, 0.7f));
         }
-        // Barcode.
         var rng = new System.Random(seed);
         c.Rect(40, 60, W - 40, 200, Color.white, 4);
         float x = 54;

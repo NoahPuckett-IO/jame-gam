@@ -2,23 +2,12 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
-// Level Two: "Stay off the floor". The second hallway's floor is glued with spilled soda (touch it
-// and you're back at your checkpoint), so Henry climbs: can-stack stairs up to the shelves, along
-// the cleared shelf boards, up a cutting-board ramp, across the aisle on a mop handle, over a
-// cereal-box bridge, launched by a kitchen sponge, across a row of cereal-box pillars, and down a
-// long baking-tray slide to the far end. Shelf boards along the route are kept clear of stock.
-//
-// Route (heading south; W = west shelves, E = east shelves, h1/h2/h3 = the three walkable boards):
-//   floor → can stairs → W h1 → ramp → W h2 → mop beam → E h2 → box bridge → E h2 → sponge →
-//   E h3 → pillars → W h3 → slide → E h1 → can stairs → floor at the far end
 static partial class GroceryStoreBuilder
 {
-    // Shelf boards (on the near side of an aisle) to leave empty when stocking, so they can be walked on.
     static readonly List<Bounds> NoStockZones = new List<Bounds>();
 
     static bool InNoStockZone(Vector3 p) => NoStockZones.Any(b => b.Contains(p));
 
-    // Heights of the walkable shelf boards (above the floor-level base), lowest first.
     static List<float> BoardHeights(Transform aisle, float x, float z)
     {
         var up = UpwardTriangles(aisle.gameObject);
@@ -27,19 +16,17 @@ static partial class GroceryStoreBuilder
 
     struct Hall
     {
-        public float x, xW, xE;          // center, west face, east face
-        public float h1, h2, h3;         // board heights
+        public float x, xW, xE;
+        public float h1, h2, h3;
         public float boardDepth;
     }
 
     static Hall levelTwoHall;
 
-    // Works out the route's geometry and reserves the shelf boards it walks on. Must run before the
-    // aisles are stocked.
     static void PlanLevelTwo(List<Transform> aisles, List<float> walkways, ShelfInfo shelf)
     {
         NoStockZones.Clear();
-        var east = aisles[0];  // Aisle 1: its west face is the hall's east side
+        var east = aisles[0];
         float x = walkways[1];
         var hall = new Hall { x = x, xW = x - WalkwayWidth / 2, xE = x + WalkwayWidth / 2, boardDepth = 7f };
         var hs = BoardHeights(east, hall.xE + 3f, east.position.z);
@@ -75,7 +62,6 @@ static partial class GroceryStoreBuilder
         TutorialZoneAt(root, new Vector3(hall.x, 5, zN - 2f), new Vector3(WalkwayWidth, 10, 14f), "stairs", "STAY OFF THE FLOOR",
             "Spilled soda has glued this floor solid. Climb the shelves and use whatever you can find to reach the far end.", "SPACE", "SHIFT");
 
-        // Wall at the start, and the sticky floor beyond it.
         BoxWall(root, hall.x, WalkwayWidth, zN - 15f, 2, 0);
         var spill = new GameObject("Sticky Soda Spill").AddComponent<BoxCollider>();
         spill.transform.SetParent(root);
@@ -85,61 +71,46 @@ static partial class GroceryStoreBuilder
         spill.gameObject.AddComponent<Hazard>();
         SodaSpill(root, hall.x, WalkwayWidth, zN - 17f, -zN + 6f, rng);
 
-        // 1. Can stairs up to the west board, h1.
         CanStairs(root, new Vector3(hall.xW + 1.4f, 0, zN - 0.5f), Vector3.back, 5, hall.h1);
         CheckpointAt(root, "Checkpoint L2-A", new Vector3(hall.xW - 3.5f, hall.h1, 95f), new Vector3(6, 4, 4), 180);
-        // Cans rolling across the board towards the aisle: time the dash past them or get bowled off.
         RollingCan(root, new Vector3(hall.xW - 5.6f, hall.h1, 86f), new Vector3(4.4f, 0, 0), 1.3f, 0f);
         RollingCan(root, new Vector3(hall.xW - 5.6f, hall.h1, 77f), new Vector3(4.4f, 0, 0), 1.1f, 0.45f);
 
-        // 2. Cutting-board ramp from W h1 up to W h2, out in the aisle, propped on a box tower.
         Ramp(root, new Vector3(hall.xW + 3f, hall.h1, 70f), new Vector3(hall.xW + 3f, hall.h2, 52f), 5.4f, true);
         CheckpointAt(root, "Checkpoint L2-B", new Vector3(hall.xW - 3.5f, hall.h2, 50f), new Vector3(6, 4, 4), 180);
         RollingCan(root, new Vector3(hall.xW - 5.6f, hall.h2, 40f), new Vector3(4.4f, 0, 0), 1.0f, 0.2f);
 
-        // 3. Mop-handle tightrope across the aisle at h2.
         Mop(root, new Vector3(hall.xW - 1f, hall.h2, 26f), new Vector3(hall.xE + 1f, hall.h2, 26f));
 
-        // 4. A cereal box laid across the gap past the shelf upright, on a box tower.
         Pillar(root, new Vector3(hall.xE - 3f, 0, 19.5f), hall.h2, lyingAlongZ: true);
         CheckpointAt(root, "Checkpoint L2-C", new Vector3(hall.xE + 3.5f, hall.h2, 12f), new Vector3(6, 4, 4), 180);
 
-        // 4b. A giant jar wedged on the board: detour out over the aisle on hanging crackers that
-        // snap a moment after you land on them.
         JarBlock(root, new Vector3(hall.xE, hall.h2, -6.5f), new Vector3(hall.xE + hall.boardDepth + 1f, hall.h3, 1f));
         CrumbleCracker(root, new Vector3(hall.xE - 4.6f, hall.h2, 3.6f));
         CrumbleCracker(root, new Vector3(hall.xE - 5.4f, hall.h2 + 1.3f, -2.2f));
         CrumbleCracker(root, new Vector3(hall.xE - 4.4f, hall.h2 + 0.4f, -8.2f));
         devWarps.Add(("Cracker Detour", new Vector3(hall.xE + 3.5f, hall.h2 + 1f, 9f), 180));
 
-        // 5. Sponge bounce pad on a pillar, launching up to a pillar at h3, then onto E h3.
         Pillar(root, new Vector3(hall.xE - 4f, 0, -13f), hall.h2, lyingAlongZ: true);
         Sponge(root, new Vector3(hall.xE - 4f, hall.h2, -13f), 23f);
         Pillar(root, new Vector3(hall.xE - 4f, 0, -21.5f), hall.h3, lyingAlongZ: true);
         CheckpointAt(root, "Checkpoint L2-D", new Vector3(hall.xE + 3.5f, hall.h3, -26f), new Vector3(6, 4, 4), 180);
         RollingCan(root, new Vector3(hall.xE + 5.6f, hall.h3, -35f), new Vector3(-4.4f, 0, 0), 1.0f, 0.3f);
 
-        // 6. Across the aisle at h3: a pillar, a paper plate swinging across on its strings, a pillar.
         Pillar(root, new Vector3(hall.x + 10f, 0, -44f), hall.h3, lyingAlongZ: false);
         PaperPlate(root, new Vector3(hall.x + 3.5f, hall.h3, -50f), new Vector3(-9f, 0, 0), 2.4f, 0f);
         devWarps.Add(("Paper Plate", new Vector3(hall.xE + 3.5f, hall.h3 + 1f, -38f), 180));
         Pillar(root, new Vector3(hall.x - 10f, 0, -56f), hall.h3, lyingAlongZ: false);
         CheckpointAt(root, "Checkpoint L2-E", new Vector3(hall.xW - 3.5f, hall.h3, -58f), new Vector3(6, 4, 4), 180);
 
-        // 7. Baking-tray slide from W h3 diagonally down to E h1.
         Slide(root, new Vector3(hall.xW - 1f, hall.h3, -61f), new Vector3(hall.xE + 1.5f, hall.h1, -96f), 4.5f);
 
-        // 8. Can stairs back down to the floor past the spill.
         CanStairs(root, new Vector3(hall.xE - 1.4f, 0, -zN + 2.5f), Vector3.left, 5, hall.h1, descendingFromBoard: true);
 
         WetFloorSign(root, new Vector3(hall.x - 6f, 0, zN - 6f), 200f);
         WetFloorSign(root, new Vector3(hall.x + 9f, 0, -zN + 3f), -20f);
     }
 
-    // ---------- pieces ----------
-
-    // A big honey jar jammed between two shelf boards, filling the board from `min` to `max` so it
-    // can't be walked past or climbed over.
     static void JarBlock(Transform parent, Vector3 min, Vector3 max)
     {
         var root = new GameObject("Jar Block").transform;
@@ -156,7 +127,6 @@ static partial class GroceryStoreBuilder
         Seal(root, "Jar Block Collider", center, size);
     }
 
-    // A solid wall of upright cereal boxes across the hall, `rows` boxes high.
     static void BoxWall(Transform parent, float xc, float width, float z, int rows, int styleOffset)
     {
         var root = new GameObject("Box Wall").transform;
@@ -166,7 +136,6 @@ static partial class GroceryStoreBuilder
         for (int c = 0; c < cols; c++)
         {
             var b = CerealBox(root, (r * 3 + c + styleOffset) % Cereals.Length);
-            // Squeezed a touch so neighbours sit side by side with a sliver of a gap instead of overlapping.
             b.transform.localScale = new Vector3(width / cols / CerealW * 0.97f, 1f, 1f);
             b.transform.rotation = Quaternion.Euler(0, (c % 2) * 180f + ((r * 7 + c * 13) % 3 - 1) * 0.8f, 0);
             PlaceOnFloor(b, new Vector3(xc - width / 2 + (c + 0.5f) * width / cols, r * CerealH, z));
@@ -174,7 +143,6 @@ static partial class GroceryStoreBuilder
         Solid(root, "Wall Collider", new Vector3(xc, rows * CerealH / 2, z), new Vector3(width + 2f, rows * CerealH, CerealD + 0.5f));
     }
 
-    // Steps made of stacked bean cans, each tower one can taller than the last.
     static void CanStairs(Transform parent, Vector3 start, Vector3 dir, int steps, float topY, bool descendingFromBoard = false)
     {
         var root = new GameObject("Can Stairs").transform;
@@ -186,7 +154,6 @@ static partial class GroceryStoreBuilder
         float canH = (topY - 0.5f) / steps;
         float s = canH / pb.size.y;
         float d = Mathf.Max(pb.size.x, pb.size.z) * s;
-        // Each step is a 2×2 cluster of stacked cans, so there's room to land on it.
         var across = Vector3.Cross(Vector3.up, dir).normalized;
         for (int i = 0; i < steps; i++)
         {
@@ -205,7 +172,6 @@ static partial class GroceryStoreBuilder
         }
     }
 
-    // A tower of upright cereal boxes reaching `topY`, capped with one lying flat (the platform).
     static void Pillar(Transform parent, Vector3 floorAt, float topY, bool lyingAlongZ)
     {
         var root = new GameObject("Box Pillar").transform;
@@ -220,7 +186,6 @@ static partial class GroceryStoreBuilder
             y += CerealH;
             i++;
         }
-        // Fill the remaining gap with a stack of lying boxes so the cap lands exactly at topY.
         while (y < topY - CerealD - 0.01f)
         {
             float h = Mathf.Min(CerealD, topY - CerealD - y);
@@ -236,7 +201,6 @@ static partial class GroceryStoreBuilder
         foreach (var b in root.GetComponentsInChildren<BoxCollider>()) b.enabled = true;
     }
 
-    // A cutting board used as a ramp between two points, its high end propped on a box pillar.
     static void Ramp(Transform parent, Vector3 low, Vector3 high, float width, bool propped)
     {
         var root = new GameObject("Ramp").transform;
@@ -259,7 +223,6 @@ static partial class GroceryStoreBuilder
         if (propped) Pillar(parent, new Vector3(high.x, 0, high.z - 1.5f), high.y - 0.6f, lyingAlongZ: true);
     }
 
-    // A mop lying across the aisle between the shelves: a narrow handle to balance along.
     static void Mop(Transform parent, Vector3 a, Vector3 b)
     {
         var root = new GameObject("Mop").transform;
@@ -272,12 +235,10 @@ static partial class GroceryStoreBuilder
         handle.transform.localScale = new Vector3(0.9f, (b - a).magnitude / 2, 0.9f);
         handle.GetComponent<Renderer>().sharedMaterial = GetMaterial("Mop Handle", new Color(0.2f, 0.45f, 0.85f));
         Object.DestroyImmediate(handle.GetComponent<Collider>());
-        // Flat-topped collider so the handle is walkable (a round one would roll Henry off).
         var col = new GameObject("Handle Collider").AddComponent<BoxCollider>();
         col.transform.SetParent(root);
         col.transform.SetPositionAndRotation(mid, Quaternion.LookRotation(b - a));
-        col.size = new Vector3(2f, 0.9f, (b - a).magnitude); // a bit wider than it looks, to be fair
-        // The mop head hanging off the far end, and a grip at the near end.
+        col.size = new Vector3(2f, 0.9f, (b - a).magnitude);
         var head = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         head.name = "Mop Head";
         head.transform.SetParent(root);
@@ -287,7 +248,6 @@ static partial class GroceryStoreBuilder
         Object.DestroyImmediate(head.GetComponent<Collider>());
     }
 
-    // A kitchen sponge that bounces Henry up.
     static void Sponge(Transform parent, Vector3 topAt, float launch)
     {
         var root = new GameObject("Sponge").transform;
@@ -307,7 +267,6 @@ static partial class GroceryStoreBuilder
         root.gameObject.AddComponent<BouncePad>().Setup(launch, visual);
     }
 
-    // A long baking tray tilted as a slide, with raised edges so you don't slip off the side.
     static void Slide(Transform parent, Vector3 top, Vector3 bottom, float width)
     {
         var root = new GameObject("Baking Tray Slide").transform;
@@ -330,17 +289,15 @@ static partial class GroceryStoreBuilder
         Part("Tray", new Vector3(0, -0.2f, 0), new Vector3(width, 0.25f, len));
         Part("Rim Left", new Vector3(-width / 2, 0.4f, 0), new Vector3(0.25f, 1.2f, len));
         Part("Rim Right", new Vector3(width / 2, 0.4f, 0), new Vector3(0.25f, 1.2f, len));
-        // Hanging wires up to the ceiling make it read as rigged up, not floating.
         var wire = GetMaterial("Wire", new Color(0.2f, 0.2f, 0.2f));
         foreach (float f in new[] { -0.35f, 0.35f })
         {
             var at = root.TransformPoint(new Vector3(0, 0, f * len));
             float h = WallHeight - at.y;
-            Box("Wire", parent, at + Vector3.up * h / 2, new Vector3(0.12f, h, 0.12f), wire); // unrotated parent: straight up
+            Box("Wire", parent, at + Vector3.up * h / 2, new Vector3(0.12f, h, 0.12f), wire);
         }
     }
 
-    // Glossy orange puddles, toppled bottles and a few cans on the sticky floor.
     static void SodaSpill(Transform parent, float xc, float width, float z0, float z1, System.Random rng)
     {
         var root = new GameObject("Soda Spill").transform;
@@ -371,7 +328,6 @@ static partial class GroceryStoreBuilder
         }
     }
 
-    // Yellow A-frame "CAUTION WET FLOOR" sign.
     static void WetFloorSign(Transform parent, Vector3 floorAt, float yaw)
     {
         var root = new GameObject("Wet Floor Sign").transform;

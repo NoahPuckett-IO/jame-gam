@@ -1,18 +1,12 @@
 using System.Collections;
 using UnityEngine;
 
-// One item knocked off a shelf: a red dashed outline the shape of its footprint appears where it
-// will land, it teeters on the shelf edge, then tumbles down in an arc. If Henry is inside the
-// outline when it lands he gets knocked flat and sent back to his checkpoint. The item then lies
-// there briefly and sinks away.
 public class FallingItem : MonoBehaviour
 {
     public static Material DashMaterial;
 
     public IEnumerator Run(Vector3 from, Vector3 landAt, float warnTime, PlayerController player)
     {
-        // Where and how it will come to rest (upright or tipped on its side, at a random yaw), and the
-        // footprint of that resting pose for the outline.
         float yaw = Random.Range(0f, 360f);
         var baseRot = transform.rotation;
         var restRot = Quaternion.Euler(0, yaw, 0) * (Random.value < 0.45f ? Quaternion.Euler(0, 0, 90) : Quaternion.identity) * baseRot;
@@ -24,7 +18,6 @@ public class FallingItem : MonoBehaviour
         bool round = Mathf.Abs(b.size.x - b.size.z) < Mathf.Max(b.size.x, b.size.z) * 0.25f;
         var ring = MakeOutline(landAt, size, round);
 
-        // Teeter on the edge for a moment.
         var startRot = transform.rotation;
         float teeter = warnTime * 0.3f;
         for (float t = 0; t < teeter; t += Time.deltaTime)
@@ -34,7 +27,6 @@ public class FallingItem : MonoBehaviour
             yield return null;
         }
 
-        // Fall along an arc, tumbling, and turn to meet the floor in its resting pose for the last part.
         float fall = warnTime - teeter;
         var spinAxis = Random.onUnitSphere;
         float spinSpeed = Random.Range(200f, 420f);
@@ -64,7 +56,6 @@ public class FallingItem : MonoBehaviour
                 player.GetComponent<FallingHitResponder>()?.Hit(new Vector3(d.x, 0, d.z).normalized);
         }
 
-        // Bounce: a little hop and a rocking wobble that dies away, with a squash on each impact.
         var tiltAxis = Vector3.Cross(Vector3.up, Random.insideUnitSphere).normalized;
         if (tiltAxis.sqrMagnitude < 0.1f) tiltAxis = Vector3.right;
         var baseScale = transform.localScale;
@@ -84,7 +75,6 @@ public class FallingItem : MonoBehaviour
         transform.SetPositionAndRotation(restPos, restRot);
         transform.localScale = baseScale;
 
-        // Rest, then sink through the floor and disappear.
         yield return new WaitForSeconds(2.2f);
         for (float t = 0; t < 1f; t += Time.deltaTime)
         {
@@ -102,7 +92,6 @@ public class FallingItem : MonoBehaviour
         return b;
     }
 
-    // Dashed red loop on the floor: an ellipse for round things, a rounded rectangle for boxes.
     LineRenderer MakeOutline(Vector3 at, Vector2 half, bool round)
     {
         var go = new GameObject("Landing Warning");
@@ -126,7 +115,6 @@ public class FallingItem : MonoBehaviour
             if (round) p = new Vector2(Mathf.Cos(a) * half.x, Mathf.Sin(a) * half.y);
             else
             {
-                // Superellipse ≈ rounded rectangle.
                 float c = Mathf.Cos(a), s = Mathf.Sin(a);
                 p = new Vector2(Mathf.Sign(c) * Mathf.Pow(Mathf.Abs(c), 0.3f) * half.x, Mathf.Sign(s) * Mathf.Pow(Mathf.Abs(s), 0.3f) * half.y);
             }

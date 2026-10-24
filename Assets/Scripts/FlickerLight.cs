@@ -1,7 +1,5 @@
 using UnityEngine;
 
-// Ceiling light that hums steadily and, if `flickery`, now and then stutters on and off.
-// Dims its fixture's emission along with the light.
 public class FlickerLight : MonoBehaviour
 {
     [SerializeField] Light lamp;
@@ -24,7 +22,6 @@ public class FlickerLight : MonoBehaviour
 
     void Update()
     {
-        // Gentle fluorescent hum.
         float level = 0.96f + 0.04f * Mathf.PerlinNoise(Time.time * 8f, transform.position.x);
 
         if (flickery)
@@ -41,7 +38,7 @@ public class FlickerLight : MonoBehaviour
         lamp.intensity = baseIntensity * level;
         if (fixture != null)
         {
-            if (block == null) block = new MaterialPropertyBlock(); // survives a script reload mid-play
+            if (block == null) block = new MaterialPropertyBlock();
             block.SetColor(EmissionId, emission * level);
             fixture.SetPropertyBlock(block);
         }

@@ -1,7 +1,5 @@
 using UnityEngine;
 
-// Something small enough for the player to pick up and put down again (see PlayerInteractor),
-// e.g. a box to use as a step.
 public class Carryable : MonoBehaviour
 {
     Collider[] colliders;
@@ -10,7 +8,6 @@ public class Carryable : MonoBehaviour
 
     void Awake() => colliders = GetComponentsInChildren<Collider>();
 
-    // Height of the item, for carrying it above the player's head.
     public float Height
     {
         get
@@ -23,7 +20,6 @@ public class Carryable : MonoBehaviour
         }
     }
 
-    // Bounds center relative to the pivot, in local space (for holding it by its middle).
     public Vector3 CenterOffsetLocal()
     {
         var rs = GetComponentsInChildren<Renderer>();
@@ -33,7 +29,6 @@ public class Carryable : MonoBehaviour
         return transform.InverseTransformVector(b.center - transform.position);
     }
 
-    // Size along its own axes (x across, y up, z forward), ignoring how it's currently rotated.
     public Vector3 LocalSize()
     {
         var mf = GetComponentInChildren<MeshFilter>();
@@ -54,9 +49,6 @@ public class Carryable : MonoBehaviour
         transform.localRotation = Quaternion.identity;
     }
 
-    // Drops the item so its bottom rests on whatever is below `point` (the player's center, pushed
-    // forward). The ray starts only a little above the player, so dropping right against a ledge
-    // puts the item on the floor in front of it rather than on top of it.
     public void PutDown(Vector3 point, Quaternion rotation)
     {
         transform.SetParent(null, true);
@@ -67,7 +59,6 @@ public class Carryable : MonoBehaviour
             ground = hit.point.y;
         transform.position = new Vector3(point.x, ground + lift, point.z);
 
-        // Dropped against a wall or ledge? Slide back towards the player until it's clear.
         var back = -(rotation * Vector3.forward);
         back.y = 0;
         var size = Size();

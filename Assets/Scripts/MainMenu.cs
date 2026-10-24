@@ -1,12 +1,11 @@
 using UnityEngine;
 
-// Title screen. The player starts disabled; Play hides the menu, moves the player to the
-// spawn point and hands over control.
 public class MainMenu : MonoBehaviour
 {
     [SerializeField] GameObject settingsPanel;
     [SerializeField] PlayerController player;
     [SerializeField] Transform spawnPoint;
+    [SerializeField] GameObject stage;
 
     void Start()
     {
@@ -19,8 +18,7 @@ public class MainMenu : MonoBehaviour
     public void Play()
     {
         gameObject.SetActive(false);
-        // The intro cutscene (woods → UFO → shrunk → waking up in a cereal box) hands control over
-        // when it's done; without one, start right away at the spawn.
+        if (stage != null) stage.SetActive(false);
         var intro = FindAnyObjectByType<IntroCutscene>();
         if (intro != null)
         {

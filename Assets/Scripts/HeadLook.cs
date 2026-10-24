@@ -1,7 +1,5 @@
 using UnityEngine;
 
-// Turns a humanoid's head and upper body toward a target (Animator look-at IK). Used in cutscenes
-// so Henry can look up at the UFO, or around the store when he wakes up.
 [RequireComponent(typeof(Animator))]
 public class HeadLook : MonoBehaviour
 {

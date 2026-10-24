@@ -1,7 +1,5 @@
 using UnityEngine;
 
-// A board lying flat on the floor, hinged at its near end, with its far end on the lever's tip.
-// When the lever swings up, the far end rises and the board becomes a ramp.
 public class LiftedRamp : LeverLoad
 {
     [SerializeField] float length = 14f;
