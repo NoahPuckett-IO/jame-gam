@@ -40,11 +40,11 @@ static class StoreAtmosphere
             // intensity has to scale with the drop to the floor.
             float drop = lightGo.transform.position.y;
             light.range = drop * 2f;
-            light.intensity = 0.36f * drop * drop; // dim, after-hours feel
+            light.intensity = 0.27f * drop * drop; // dim, after-hours feel
             light.shadows = LightShadows.None;
 
             bool flicker = rng.NextDouble() < 0.18;
-            fixture.AddComponent<FlickerLight>().Setup(light, fixture.GetComponent<Renderer>(), LampColor * 2.2f, flicker);
+            fixture.AddComponent<FlickerLight>().Setup(light, fixture.GetComponent<Renderer>(), LampColor * 1.7f, flicker);
         }
     }
 
@@ -59,7 +59,7 @@ static class StoreAtmosphere
         }
         mat.color = Color.white;
         mat.EnableKeyword("_EMISSION");
-        mat.SetColor("_EmissionColor", LampColor * 2.2f);
+        mat.SetColor("_EmissionColor", LampColor * 1.7f);
         mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
         EditorUtility.SetDirty(mat);
         return mat;
@@ -163,7 +163,7 @@ static class StoreAtmosphere
 
         var bloom = Add<Bloom>(profile);
         bloom.threshold.Override(1f);
-        bloom.intensity.Override(0.9f);
+        bloom.intensity.Override(0.6f);
         bloom.scatter.Override(0.7f);
 
         // Moody night-shift grade: teal-green shadows, cool highlights, crushed blacks.

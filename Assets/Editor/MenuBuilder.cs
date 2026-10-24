@@ -48,6 +48,7 @@ static class MenuBuilder
         var settingsPanel = Panel("Settings Panel", root, new Vector2(0.3f, 0.2f), new Vector2(0.7f, 0.8f), new Color(0.15f, 0.16f, 0.2f, 0.98f));
         Label("Settings Title", settingsPanel.transform, "Settings\n(coming soon)", 60, TextAnchor.MiddleCenter, new Vector2(0, 0.4f), Vector2.one);
         var back = MakeButton("Back Button", settingsPanel.transform, "Back", new Vector2(0.3f, 0.1f), new Vector2(0.7f, 0.3f));
+        settingsPanel.SetActive(false); // hidden until Settings is clicked (also keeps it out of the Game view in edit mode)
 
         var menu = canvasGo.AddComponent<MainMenu>();
         var so = new SerializedObject(menu);

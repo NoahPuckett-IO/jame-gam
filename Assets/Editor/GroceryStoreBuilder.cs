@@ -128,7 +128,8 @@ static partial class GroceryStoreBuilder
         BuildCoolerRun(store.transform, coolersFrom, right, depth / 2, +1, CoolerDrinks, "DAIRY & DRINKS", new Color(0.1f, 0.35f, 0.85f), 1);
         BuildCoolerRun(store.transform, coolersFrom, right, -depth / 2, -1, CoolerFrozen, "FROZEN FOODS", new Color(0.8f, 0.1f, 0.12f), 2);
         BacklitSign(store.transform, new Vector3(right - 0.05f * Scale, WallHeight - 1.4f * Scale, 0), Vector3.left,
-            7f * Scale, 0.9f * Scale, "FRESH MARKET", new Color(0.15f, 0.55f, 0.25f));
+            7f * Scale, 1.1f * Scale, "FRESH MARKET", new Color(0.15f, 0.55f, 0.25f),
+            subtitle: "OPEN 24 HOURS  •  " + MenuBuilder.GameTitle.ToUpper(), iconLeft: "store", iconRight: "cart");
         for (int i = 0; i < aisles.Count; i++)
             HangAisleSign(store.transform, aisles[i].position.x, -aisleLength / 2, i + 1, AisleNames[i]);
 
@@ -241,12 +242,22 @@ static partial class GroceryStoreBuilder
         area.SetParent(store);
         float laneX = left + CheckoutWidth * 0.6f;
 
-        // Counters: 0.9 m tall, at most 2.6 m long. Lanes between them; the middle lane lines up with the door.
+        // Counters: 1.25 m tall (taller than the 1.05 m carts), at most 3 m long, each standing on a
+        // black rubber mat. Lanes between them; the middle lane lines up with the door.
         var cashier = LoadModel("cashier");
+        var rubber = GetMaterial("RubberMat", new Color(0.05f, 0.05f, 0.055f));
+        rubber.SetFloat("_Smoothness", 0.05f);
+        float matT = 0.015f * Scale;
         checkoutCounters.Clear();
         if (cashier != null)
             foreach (float z in new[] { -3.2f, -1.6f, 1.6f, 3.2f })
-                checkoutCounters.Add(PlaceProp(cashier, area, 0.9f, 2.6f, alongX: true, new Vector3(laneX, 0, z * Scale)));
+            {
+                var counter = PlaceProp(cashier, area, 1.25f, 3f, alongX: true, new Vector3(laneX, matT, z * Scale));
+                var b = GetBounds(counter);
+                Box("Register Mat", area, new Vector3(b.center.x, matT / 2, b.center.z),
+                    new Vector3(b.size.x + 0.5f * Scale, matT, b.size.z + 0.7f * Scale), rubber);
+                checkoutCounters.Add(counter);
+            }
 
         // Chest freezers are ~0.9 m tall, upright ones ~2 m.
         var freezers = new[] { LoadModel("Frezer"), LoadModel("Frezer2") }.Where(f => f != null).ToArray();
@@ -266,12 +277,12 @@ static partial class GroceryStoreBuilder
         var cart = LoadModel("ShopingCar");
         if (cart != null)
         {
-            for (int row = 0; row < 3; row++)
+            for (int row = 0; row < 2; row++) // two long rows, clear of the drinks racks at the lane ends
             {
                 float z = -DoorWidth / 2 - 0.6f * Scale;
-                for (int i = 0; i < 8; i++)
+                for (int i = 0; i < 11; i++)
                 {
-                    PlaceProp(cart, area, 1.05f, 1.1f, alongX: false, new Vector3(left + (0.5f + row * 0.7f) * Scale, 0, z));
+                    PlaceProp(cart, area, 1.05f, 1.1f, alongX: false, new Vector3(left + (0.45f + row * 0.65f) * Scale, 0, z));
                     z -= 0.38f * Scale; // nested carts overlap most of their length
                 }
             }
@@ -354,16 +365,34 @@ static partial class GroceryStoreBuilder
         sign.SetParent(store);
         sign.position = new Vector3(x, WallHeight - 1.1f * Scale, z);
 
-        var boardMat = GetMaterial("SignBoard", new Color(0.12f, 0.35f, 0.62f));
-        Box("Board", sign, sign.position, new Vector3(1.6f * Scale, 0.55f * Scale, 0.04f * Scale), boardMat);
         var wireMat = GetMaterial("Wire", new Color(0.2f, 0.2f, 0.2f));
         foreach (float dx in new[] { -0.6f, 0.6f })
             Box("Wire", sign, sign.position + new Vector3(dx * Scale, 0.6f * Scale, 0), new Vector3(0.01f * Scale, 0.65f * Scale, 0.01f * Scale), wireMat);
 
-        foreach (int face in new[] { -1, 1 })
-            MakeText(sign, sign.position + Vector3.forward * face * 0.025f * Scale, face < 0 ? 0 : 180,
-                $"{number}\n{label}", 1.45f * Scale, 0.47f * Scale, Color.white);
+        // Two-sided lightbox: big aisle number in a white circle on the left, the aisle name, and an icon.
+        BacklitSign(sign, sign.position, Vector3.back, 1.7f * Scale, 0.6f * Scale, label, new Color(0.12f, 0.35f, 0.62f),
+            twoSided: true, subtitle: AisleSubtitles[number - 1], iconRight: AisleIcons[number - 1],
+            iconLeft: ""); // empty icon = keep the left slot clear for the number disc below
+        var disc = GetMaterial("SignDisc", Color.white);
+        foreach (var n in new[] { Vector3.back, Vector3.forward })
+        {
+            var right = Vector3.Cross(Vector3.up, -n).normalized;
+            var at = sign.position + right * (-0.85f * Scale + 0.3f * Scale) + n * 0.05f * Scale;
+            var circle = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            circle.name = "Number Disc";
+            circle.transform.SetParent(sign);
+            circle.transform.position = at;
+            circle.transform.rotation = Quaternion.FromToRotation(Vector3.up, n);
+            circle.transform.localScale = new Vector3(0.44f * Scale, 0.005f * Scale, 0.44f * Scale);
+            circle.GetComponent<Renderer>().sharedMaterial = disc;
+            Object.DestroyImmediate(circle.GetComponent<Collider>());
+            MakeText(sign, at + n * 0.015f * Scale, Mathf.Atan2(-n.x, -n.z) * Mathf.Rad2Deg, number.ToString(),
+                0.3f * Scale, 0.3f * Scale, new Color(0.12f, 0.35f, 0.62f));
+        }
     }
+
+    static readonly string[] AisleSubtitles = { "BREAD • PASTRY • BREAKFAST", "SOUP • BEANS • SAUCES", "MILK • EGGS • SODA", "FRUIT • VEGETABLES", "MEAT • FISH • SNACKS" };
+    static readonly string[] AisleIcons = { "bakery", "soup", "drink", "apple", "fish" };
 
     // Moves the spawn to the checkout side of the store, facing the lanes, to look at it quickly.
     // Rebuilding the store puts the spawn back.
@@ -713,8 +742,8 @@ static partial class GroceryStoreBuilder
     // doesn't mistake box lids for shelf surfaces.
     static void PlaceBoxes(Transform store, List<Transform> aisles, ShelfInfo shelf, float aisleLength)
     {
-        var closed = AssetDatabase.LoadAssetAtPath<GameObject>($"{KenneyFolder}/cardboardBoxClosed.fbx");
-        var open = AssetDatabase.LoadAssetAtPath<GameObject>($"{KenneyFolder}/cardboardBoxOpen.fbx");
+        var closed = LoadKenney("cardboardBoxClosed");
+        var open = LoadKenney("cardboardBoxOpen");
         if (closed == null || open == null) return;
 
         var root = new GameObject("Boxes").transform;
@@ -746,8 +775,8 @@ static partial class GroceryStoreBuilder
     // up walkway 0, round the north end of Aisle 1, down walkway 1, round the south end of Aisle 2...
     static void BuildBlockades(Transform store, List<Transform> aisles, ShelfInfo shelf, float aisleLength, float depth)
     {
-        var closed = AssetDatabase.LoadAssetAtPath<GameObject>($"{KenneyFolder}/cardboardBoxClosed.fbx");
-        var open = AssetDatabase.LoadAssetAtPath<GameObject>($"{KenneyFolder}/cardboardBoxOpen.fbx");
+        var closed = LoadKenney("cardboardBoxClosed");
+        var open = LoadKenney("cardboardBoxOpen");
         if (closed == null || open == null) return;
 
         var root = new GameObject("Blockades").transform;
@@ -885,9 +914,24 @@ static partial class GroceryStoreBuilder
         if (any) return b;
 
         var renderers = go.GetComponentsInChildren<Renderer>();
+        if (renderers.Length == 0)
+        {
+            Debug.LogWarning($"[GroceryStoreBuilder] {go.name} has no mesh to measure; using its position.", go);
+            return new Bounds(go.transform.position, Vector3.one * 0.01f);
+        }
         b = renderers[0].bounds;
         foreach (var r in renderers) b.Encapsulate(r.bounds);
         return b;
+    }
+
+    // A model is only usable if it actually imported with geometry. A broken or placeholder file
+    // (e.g. a Git LFS pointer that was never downloaded) imports as an empty object.
+    static GameObject Usable(GameObject prefab, string path)
+    {
+        if (prefab == null) return null;
+        if (prefab.GetComponentsInChildren<MeshFilter>(true).Any(mf => mf.sharedMesh != null)) return prefab;
+        Debug.LogWarning($"[GroceryStoreBuilder] Skipping {path}: it has no mesh. If it's a ~130 byte text file, run 'git lfs pull'.");
+        return null;
     }
 
     // Every model folder gets Read/Write enabled so GetBounds and the shelf scan can see vertices.
@@ -913,19 +957,35 @@ static partial class GroceryStoreBuilder
                 mf.gameObject.AddComponent<MeshCollider>().sharedMesh = mf.sharedMesh;
     }
 
-    // A BoxCollider added next to a MeshFilter sizes itself to that mesh.
+    // A BoxCollider added next to a MeshFilter sizes itself to that mesh. Some Kenney models are
+    // mirrored (negative scale), which BoxCollider can't handle, so those get a convex MeshCollider.
     static void AddBoxColliders(GameObject go)
     {
         foreach (var mf in go.GetComponentsInChildren<MeshFilter>())
-            if (mf.GetComponent<Collider>() == null)
-                mf.gameObject.AddComponent<BoxCollider>();
+        {
+            if (mf.GetComponent<Collider>() != null || mf.sharedMesh == null) continue;
+            var s = mf.transform.lossyScale;
+            if (s.x < 0 || s.y < 0 || s.z < 0)
+            {
+                var mc = mf.gameObject.AddComponent<MeshCollider>();
+                mc.sharedMesh = mf.sharedMesh;
+                mc.convex = true;
+            }
+            else mf.gameObject.AddComponent<BoxCollider>();
+        }
     }
 
     static GameObject LoadModel(string name)
     {
         if (name == "BeanCan") return BeanCanBuilder.GetOrCreate();
-        if (name.StartsWith("k:")) return AssetDatabase.LoadAssetAtPath<GameObject>($"{FoodKitFolder}/{name.Substring(2)}.fbx");
-        return AssetDatabase.LoadAssetAtPath<GameObject>($"{ModelFolder}/{name}.fbx");
+        string path = name.StartsWith("k:") ? $"{FoodKitFolder}/{name.Substring(2)}.fbx" : $"{ModelFolder}/{name}.fbx";
+        return Usable(AssetDatabase.LoadAssetAtPath<GameObject>(path), path);
+    }
+
+    static GameObject LoadKenney(string name)
+    {
+        string path = $"{KenneyFolder}/{name}.fbx";
+        return Usable(AssetDatabase.LoadAssetAtPath<GameObject>(path), path);
     }
 
     static void Box(string name, Transform parent, Vector3 pos, Vector3 size, Material mat)
