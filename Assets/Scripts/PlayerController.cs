@@ -52,6 +52,8 @@ public class PlayerController : MonoBehaviour
     void Awake()
     {
         controller = GetComponent<CharacterController>();
+        controller.stepOffset = 0.45f;
+        controller.slopeLimit = 50f;
         if (cam == null && Camera.main != null) cam = Camera.main.transform;
 
         moveAction = InputSystem.actions.FindAction("Player/Move", true);
@@ -204,6 +206,13 @@ public class PlayerController : MonoBehaviour
         Vector3 velocity = planarVelocity + knockback + Vector3.up * verticalVelocity;
         standingOn = null;
         controller.Move(velocity * Time.deltaTime);
+        if (grounded && !controller.isGrounded && verticalVelocity <= 0f && Time.time >= dashUntil)
+        {
+            var feet = transform.position + controller.center + Vector3.down * (controller.height / 2f - controller.radius);
+            if (Physics.SphereCast(feet, controller.radius * 0.95f, Vector3.down, out var hit, 0.9f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
+                && hit.normal.y > 0.6f && !hit.collider.transform.IsChildOf(transform))
+                controller.Move(Vector3.down * (hit.distance + 0.02f));
+        }
 
         platform = controller.isGrounded ? standingOn : null;
         if (platform != null)

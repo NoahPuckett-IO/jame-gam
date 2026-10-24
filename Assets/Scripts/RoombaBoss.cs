@@ -32,6 +32,9 @@ public class RoombaBoss : MonoBehaviour
     float phaseTime, seenTime, chaseLeft, pauseLeft, spin = 35f, spinDir = 1f, nextFlip;
     Vector3 target;
     bool rampWest, hasTarget;
+    Vector3 homePos;
+    Quaternion homeRot;
+    float brushSpeed;
     const int Rays = 40;
 
     void Start()
@@ -56,6 +59,10 @@ public class RoombaBoss : MonoBehaviour
         fan.GetComponent<MeshFilter>().sharedMesh = fanMesh;
         fan.gameObject.SetActive(false);
         SetButton(Color.black, 0f);
+        if (statusLight != null) statusLight.enabled = false;
+        if (ledRenderer != null) ledRenderer.material.SetColor("_EmissionColor", Color.black);
+        homePos = transform.position;
+        homeRot = transform.rotation;
     }
 
     void OnDestroy()
@@ -65,16 +72,21 @@ public class RoombaBoss : MonoBehaviour
 
     void OnPlayerRespawned()
     {
-        if (phase == Phase.Scan) phaseTime = 0f;
+        if (phase != Phase.Scan && phase != Phase.Rampage && phase != Phase.Hunt) return;
+        transform.SetPositionAndRotation(homePos, homeRot);
+        phase = Phase.Scan;
+        phaseTime = 0f;
         seenTime = 0f;
         chaseLeft = 0f;
+        pauseLeft = 0f;
         hasTarget = false;
+        SetButton(new Color(1f, 0.2f, 0.1f), 2f);
     }
 
     void Update()
     {
         if (player == null) return;
-        foreach (var b in brushes) b.Rotate(0f, (phase == Phase.Dead ? 0f : 720f) * Time.deltaTime, 0f, Space.Self);
+        foreach (var b in brushes) b.Rotate(0f, brushSpeed * Time.deltaTime, 0f, Space.Self);
 
         switch (phase)
         {
@@ -100,15 +112,55 @@ public class RoombaBoss : MonoBehaviour
     IEnumerator Wake()
     {
         phase = Phase.Dead;
-        PlayerController.Shake(0.4f);
-        Show(0, "VAC-3000", "The store's robot vacuum has woken up and it really doesn't like crumbs. Stay out of its red scanner beam: duck behind the clutter on the floor.");
-        for (float t = 0; t < 1.5f; t += Time.deltaTime)
+        player.BeginCutscene();
+        player.CameraLocked = true;
+        var cam = Camera.main.transform;
+        var fromPos = cam.position;
+        var fromRot = cam.rotation;
+        var focus = transform.position + Vector3.up * 0.9f;
+        var shot = transform.position + transform.forward * 9f + transform.right * 3f + Vector3.up * 2.4f;
+        var shotRot = Quaternion.LookRotation(focus - shot);
+        for (float t = 0; t < 1.3f; t += Time.deltaTime)
         {
-            transform.Rotate(0f, 360f * Time.deltaTime * (t / 1.5f), 0f);
+            float k = Mathf.SmoothStep(0f, 1f, t / 1.3f);
+            cam.SetPositionAndRotation(Vector3.Lerp(fromPos, shot, k), Quaternion.Slerp(fromRot, shotRot, k));
             yield return null;
         }
+        yield return new WaitForSeconds(0.4f);
+
+        var red = new Color(1f, 0.2f, 0.1f);
+        if (statusLight != null) statusLight.enabled = true;
+        for (float t = 0; t < 1.8f; t += Time.deltaTime)
+        {
+            float k = t / 1.8f;
+            bool blink = k < 0.5f && Mathf.Repeat(t, 0.24f) < 0.12f;
+            float on = blink ? 0f : k;
+            SetButton(red, 2f * on);
+            if (ledRenderer != null) ledRenderer.material.SetColor("_EmissionColor", new Color(1f, 0.3f, 0.2f) * 4f * on);
+            if (statusLight != null) statusLight.intensity = 18f * on;
+            brushSpeed = 720f * k * k;
+            transform.Rotate(0f, 300f * k * k * Time.deltaTime, 0f);
+            transform.position = homePos + Vector3.up * Mathf.Abs(Mathf.Sin(t * 30f)) * 0.04f * (1f - k);
+            yield return null;
+        }
+        transform.position = homePos;
+        PlayerController.Shake(0.4f);
         fan.gameObject.SetActive(true);
-        SetButton(new Color(1f, 0.2f, 0.1f), 2f);
+        SetFan(ScanColor);
+        UpdateFan();
+        yield return new WaitForSeconds(0.9f);
+
+        for (float t = 0; t < 0.9f; t += Time.deltaTime)
+        {
+            float k = Mathf.SmoothStep(0f, 1f, t / 0.9f);
+            cam.SetPositionAndRotation(Vector3.Lerp(shot, fromPos, k), Quaternion.Slerp(shotRot, fromRot, k));
+            yield return null;
+        }
+        player.CameraLocked = false;
+        player.EndCutscene();
+        homeRot = transform.rotation;
+        Show(0, "VAC-3000", "Someone left the vacuum on! Dodge its attacks and turn it off to escape.");
+        StartCoroutine(HideCard(6f));
         phase = Phase.Scan;
         phaseTime = 0f;
     }
@@ -135,7 +187,6 @@ public class RoombaBoss : MonoBehaviour
             phase = Phase.Rampage;
             phaseTime = 0f;
             hasTarget = false;
-            Show(1, "RAMPAGE!", "It's slamming into the shelves! Watch for the red outlines of falling stock and stay out of its way.");
         }
     }
 
@@ -168,7 +219,6 @@ public class RoombaBoss : MonoBehaviour
             phaseTime = 0f;
             hasTarget = false;
             SetButton(new Color(0.2f, 1f, 0.35f), 4f);
-            Show(2, "POWER DOWN", "It's calmed down and gone back to cleaning. If it spots you it'll chase you, so jump on the glowing power button on top to switch it off.");
         }
     }
 
@@ -342,6 +392,7 @@ public class RoombaBoss : MonoBehaviour
 
     IEnumerator PowerDown()
     {
+        brushSpeed = 0f;
         phase = Phase.Dead;
         player.Launch(10f);
         PlayerController.Shake(0.5f);
@@ -372,6 +423,12 @@ public class RoombaBoss : MonoBehaviour
             body.AddForce(new Vector3(Random.Range(-3f, 3f), Random.Range(2f, 5f), Random.Range(4f, 9f)), ForceMode.VelocityChange);
             body.AddTorque(Random.insideUnitSphere * 4f, ForceMode.VelocityChange);
         }
+    }
+
+    IEnumerator HideCard(float after)
+    {
+        yield return new WaitForSeconds(after);
+        if (popup != null) popup.Hide(this);
     }
 
     void Show(int glyph, string heading, string text)

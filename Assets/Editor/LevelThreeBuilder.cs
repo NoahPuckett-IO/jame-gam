@@ -41,8 +41,6 @@ static partial class GroceryStoreBuilder
             l.intensity = 120f;
         }
 
-        TutorialZoneAt(root, new Vector3(x, 5, zS + 4f), new Vector3(WalkwayWidth, 10, 14f), "frozen", "BRRR... IT'S ICE",
-            "The floor is frozen solid: you'll slide and turn slowly. Don't fall in the melt water.", "WASD", "SPACE");
 
         FreezingWater(root, x, poolA, poolB);
         int cubes = 5;
@@ -61,8 +59,6 @@ static partial class GroceryStoreBuilder
         WhippedCream(root, new Vector3(x + 11f, 12f, bz + 7f), 24f);
         IceTower(root, new Vector3(x + 14.5f, 0, bz + 14f), 24f);
         WhippedCream(root, new Vector3(x + 14.5f, 24f, bz + 14f), 24f);
-        TutorialZoneAt(root, new Vector3(x, 5, bz - 3f), new Vector3(WalkwayWidth, 10, 8f), "icecream", "WHIPPED UP",
-            "Land on the whipped cream to bounce. Steer in the air to reach the next tower.", "SPACE");
         CheckpointAt(root, "Checkpoint L3-C", new Vector3(xE + fDepth / 2, FreezerHeight, bz + 22f), new Vector3(fDepth, 4, 4), 0);
 
         var bags = Measure(new[] { ("k:bag", 0.25f), ("k:ice-cream-cup", 0.12f), ("IceCream", 0.15f), ("k:pizza-box", 0.35f) });
@@ -105,8 +101,6 @@ static partial class GroceryStoreBuilder
             }
             else IceCube(root, at, size, bob: 0.35f);
         }
-        TutorialZoneAt(root, new Vector3(xE + fDepth / 2, FreezerHeight + 3f, crossZ - 12f), new Vector3(fDepth, 6f, 8f), "frozen", "ON THIN ICE",
-            "Hop across on the ice. One block drifts, and the thin sheet at the end cracks a moment after you land.", "SPACE");
         foreach (float dz in new[] { -6.5f, 6.5f })
             Seal(root, "Crossing Wall", new Vector3(x, WallHeight / 2, crossZ + dz), new Vector3(WalkwayWidth, WallHeight, 1f));
         IceBarrier(root, xE, xE + fDepth, crossZ + 6.5f);
@@ -302,8 +296,6 @@ static partial class GroceryStoreBuilder
         step.isStatic = false;
         step.AddComponent<Carryable>();
 
-        TutorialZoneAt(parent, new Vector3(x, 5, pivotZ - 12f), new Vector3(WalkwayWidth, 10, 16f), "hand", "COLD SHOULDER",
-            "The popsicle stick's short end is too high. Carry the ice cube over to stand on, then tip the stick to lift the pizza box.", "E", "SPACE");
     }
 
     static void FreezerWall(Transform parent, float xFront, int dir, float z0, float z1, float depth, System.Random rng)

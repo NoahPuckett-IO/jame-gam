@@ -11,6 +11,8 @@ public class FootGrounder : MonoBehaviour
     Transform hips, leftFoot, rightFoot, groundRef;
     float applied;
 
+    public float Offset => applied;
+
     void Awake()
     {
         animator = GetComponent<Animator>();

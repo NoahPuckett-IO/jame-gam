@@ -21,7 +21,7 @@ static partial class GroceryStoreBuilder
 
         WakeUpBox(level, spawn.position, out wakeInside, out wakeOutside);
         TutorialZoneAt(level, new Vector3(xc, 5, spawn.position.z + 14f), new Vector3(w, 10, 24f), "walk", "WHERE AM I?",
-            "Walk with WASD and look with the mouse. Space jumps, and Shift does a quick dash that recharges in five seconds.", "WASD", "SHIFT", "SPACE");
+            "Walk with WASD and look with the mouse. Space jumps, and Shift does a dash that recharges in five seconds.", "WASD", "SHIFT", "SPACE");
 
         BuildSeesawPuzzle(level, xc, w, start + aisleLength * 0.3f);
         BuildStepPuzzle(level, xc, w, start + aisleLength * 0.52f);
@@ -347,7 +347,7 @@ static partial class GroceryStoreBuilder
         Matchbox(root, new Vector3(xc, 0, nearTipZ - 1.4f));
 
         TutorialZoneAt(level, new Vector3(xc, 5, nearTipZ - 6f), new Vector3(w, 10, 16f), "balance", "TIP THE SCALES",
-            "Climb the matchbox and jump onto the short end of the ruler. Your weight will lever the box up.", "SPACE");
+            "Use the ruler to wedge open a gap to get through.", "SPACE");
     }
 
     static Transform Plank(Transform parent, string name, Vector3 pivotAt, float nearArm, float farArm, float width, float thick, Material mat, bool ticks)
@@ -428,7 +428,7 @@ static partial class GroceryStoreBuilder
         devWarps.Add(("Puzzle 2", new Vector3(xc + w * 0.25f - 4f, 1, ledgeZ - 20f), 0));
 
         TutorialZoneAt(level, new Vector3(xc, 5, ledgeZ - 9f), new Vector3(w, 10, 16f), "hand", "NEED A BOOST?",
-            "Pick up the small box, carry it to the ledge and put it down to use as a step.", "E");
+            "Carry the small box to the ledge to get over.", "E");
     }
 
     static void BuildRampPuzzle(Transform level, float xc, float w, float wallZ)
@@ -465,16 +465,16 @@ static partial class GroceryStoreBuilder
         Transform board;
         if (boardPrefab != null)
         {
-            board = FitInto(boardPrefab, hinge, new Vector3(rampW, 0.6f, rampLen));
-            board.localPosition = new Vector3(0, 0, rampLen / 2);
+            board = FitInto(boardPrefab, hinge, new Vector3(rampW, 0.6f, rampLen + 1.6f));
+            board.localPosition = new Vector3(0, 0, (rampLen + 1.6f) / 2);
             AddBoxColliders(board.gameObject);
         }
         else
         {
             board = GameObject.CreatePrimitive(PrimitiveType.Cube).transform;
             board.SetParent(hinge, false);
-            board.localScale = new Vector3(rampW, 0.6f, rampLen);
-            board.localPosition = new Vector3(0, 0, rampLen / 2);
+            board.localScale = new Vector3(rampW, 0.6f, rampLen + 1.6f);
+            board.localPosition = new Vector3(0, 0, (rampLen + 1.6f) / 2);
         }
         foreach (var t in hinge.GetComponentsInChildren<Transform>()) t.gameObject.isStatic = false;
         hinge.gameObject.AddComponent<Rigidbody>().isKinematic = true;
@@ -505,8 +505,6 @@ static partial class GroceryStoreBuilder
         devWarps.Add(("Puzzle 3", new Vector3(xR - 9f, 1, rampFarZ - rampLen - 12f), 0));
         SpillPieces(root, new Vector3(xc + 6f, 0, wallZ - 3f), 4f, 30);
 
-        TutorialZoneAt(level, new Vector3(xc, 5, rampFarZ - rampLen - 4f), new Vector3(w, 10, 22f), "stairs", "BUILD A RAMP",
-            "Bring the box over to the spatula's raised end, climb on, and your weight will lift the cutting board into a ramp.", "E", "SPACE");
     }
 
     static void TutorialZoneAt(Transform parent, Vector3 center, Vector3 size, string icon, string title, string body, params string[] keys)

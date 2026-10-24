@@ -17,6 +17,7 @@ static partial class GroceryStoreBuilder
         var aisle = BuildAisle(5, store, edge - shelf.gondolaDepth / 2, units, aisleLength, shelfPrefab, shelf);
         StockAisle(aisle, shelf, aisleLength, Stock[Stock.Length - 1], sides: new[] { 1 });
         HangAisleSign(store, x, zS, 5, "CLEANING SUPPLIES", 0);
+        Seal(root, "Above Aisle 5", new Vector3(edge - shelf.gondolaDepth / 2, (ShelfHeight - 0.4f + WallHeight) / 2, 0), new Vector3(shelf.gondolaDepth, WallHeight - ShelfHeight + 0.4f, aisleLength));
 
         EndBlock(root, "South Block", edge - shelf.gondolaDepth, edge, -wallZ, zS, out _);
         var gate = EndBlock(root, "Exit Gate", edge - shelf.gondolaDepth, edge, zN, wallZ, out var gateSeal);

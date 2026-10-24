@@ -59,8 +59,6 @@ static partial class GroceryStoreBuilder
         float zN = aisleLength / 2;
         var rng = new System.Random(202);
 
-        TutorialZoneAt(root, new Vector3(hall.x, 5, zN - 2f), new Vector3(WalkwayWidth, 10, 14f), "stairs", "STAY OFF THE FLOOR",
-            "Spilled soda has glued this floor solid. Climb the shelves and use whatever you can find to reach the far end.", "SPACE", "SHIFT");
 
         BoxWall(root, hall.x, WalkwayWidth, zN - 15f, 2, 0);
         var spill = new GameObject("Sticky Soda Spill").AddComponent<BoxCollider>();
@@ -76,7 +74,7 @@ static partial class GroceryStoreBuilder
         RollingCan(root, new Vector3(hall.xW - 5.6f, hall.h1, 86f), new Vector3(4.4f, 0, 0), 1.3f, 0f);
         RollingCan(root, new Vector3(hall.xW - 5.6f, hall.h1, 77f), new Vector3(4.4f, 0, 0), 1.1f, 0.45f);
 
-        Ramp(root, new Vector3(hall.xW + 3f, hall.h1, 70f), new Vector3(hall.xW + 3f, hall.h2, 52f), 5.4f, true);
+        Ramp(root, new Vector3(hall.xW + 2.2f, hall.h1, 70f), new Vector3(hall.xW + 2.2f, hall.h2, 52f), 5.4f, true);
         CheckpointAt(root, "Checkpoint L2-B", new Vector3(hall.xW - 3.5f, hall.h2, 50f), new Vector3(6, 4, 4), 180);
         RollingCan(root, new Vector3(hall.xW - 5.6f, hall.h2, 40f), new Vector3(4.4f, 0, 0), 1.0f, 0.2f);
 

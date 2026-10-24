@@ -2,6 +2,7 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+[DefaultExecutionOrder(200)]
 [RequireComponent(typeof(PlayerController))]
 public class PlayerInteractor : MonoBehaviour
 {
@@ -20,6 +21,7 @@ public class PlayerInteractor : MonoBehaviour
         player = GetComponent<PlayerController>();
         anim = GetComponent<PlayerAnimator>();
         ik = GetComponentInChildren<CarryIK>();
+        grounder = GetComponentInChildren<FootGrounder>();
         interact = InputSystem.actions.FindAction("Player/Interact", true);
     }
 
@@ -68,7 +70,7 @@ public class PlayerInteractor : MonoBehaviour
         grabFrom = fromPos;
         grabFromRot = fromRot;
         grabStart = Time.time;
-        if (anim != null) anim.SetCarrying(true);
+
         if (ik != null) ik.Hold(held.transform, heldSize, heldCenterOffset);
         yield return new WaitForSeconds(BendTime - GrabAt);
         busy = false;
@@ -77,7 +79,7 @@ public class PlayerInteractor : MonoBehaviour
     void LateUpdate()
     {
         if (held == null) return;
-        float headTop = transform.position.y + 1.12f;
+        float headTop = transform.position.y + 1.08f + (grounder != null ? grounder.Offset : 0f);
         var center = transform.position + transform.forward * 0.05f;
         center.y = headTop + heldSize.y * 0.5f;
 
@@ -92,6 +94,7 @@ public class PlayerInteractor : MonoBehaviour
     Quaternion grabFromRot;
     float grabStart;
     CarryIK ik;
+    FootGrounder grounder;
 
     IEnumerator PutDown()
     {

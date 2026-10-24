@@ -111,6 +111,17 @@ static partial class GroceryStoreBuilder
             StockAisle(aisles[i], shelf, aisleLength, Stock[i], sides: i == 1 ? new[] { 1 } : i == 2 ? new[] { -1 } : null);
         StockAisle(wallShelf, shelf, aisleLength, Stock[1], sides: new[] { -1 });
 
+        var bounds = new GameObject("Boundaries").transform;
+        bounds.SetParent(store.transform);
+        float topH = WallHeight - ShelfHeight + 0.4f, topY = (ShelfHeight - 0.4f + WallHeight) / 2;
+        for (int i = 0; i < aisles.Count; i++)
+        {
+            float ax = aisles[i].position.x, g = shelf.gondolaDepth;
+            float x0 = i == 1 ? ax : ax - g / 2, x1 = i == 2 ? ax : ax + g / 2;
+            Seal(bounds, $"Above Aisle {i + 1}", new Vector3((x0 + x1) / 2, topY, 0), new Vector3(x1 - x0, topH, aisleLength));
+        }
+        Seal(bounds, "Above Wall Shelf", new Vector3(wallShelf.position.x, topY, 0), new Vector3(shelf.gondolaDepth, topH, aisleLength));
+
         BuildEndcaps(store.transform, aisles, shelf, aisleLength);
         BuildCheckout(store.transform, left, depth);
         DressCheckout(store.transform, left, right, depth);
@@ -188,9 +199,6 @@ static partial class GroceryStoreBuilder
 
         MenuBuilder.Build(controller, spawn);
         BuildMusic();
-        var hud = new GameObject("Dash HUD");
-        hud.transform.SetParent(store.transform);
-        hud.AddComponent<DashMeter>().Setup(AssetDatabase.LoadAssetAtPath<Font>("Assets/Fonts/BebasNeue-Regular.ttf"));
 
         if (Camera.main != null)
         {

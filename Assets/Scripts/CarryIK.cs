@@ -8,7 +8,13 @@ public class CarryIK : MonoBehaviour
     Vector3 size, centerOffset;
     float weight, targetWeight;
 
-    void Awake() => animator = GetComponent<Animator>();
+    FootGrounder grounder;
+
+    void Awake()
+    {
+        animator = GetComponent<Animator>();
+        grounder = GetComponent<FootGrounder>();
+    }
 
     public void Hold(Transform held, Vector3 localSize, Vector3 localCenterOffset)
     {
@@ -30,16 +36,18 @@ public class CarryIK : MonoBehaviour
     {
         if (item == null || weight <= 0.001f) return;
         var center = item.position + item.TransformVector(centerOffset);
-        var low = center - item.up * (size.y * 0.3f);
-        Place(AvatarIKGoal.LeftHand, low - item.right * (size.x / 2 + 0.03f), item.right);
-        Place(AvatarIKGoal.RightHand, low + item.right * (size.x / 2 + 0.03f), -item.right);
+        float lift = grounder != null ? grounder.Offset : 0f;
+        var low = center - item.up * (size.y * 0.3f) - Vector3.up * lift;
+        Place(AvatarIKGoal.LeftHand, AvatarIKHint.LeftElbow, low - item.right * (size.x / 2 + 0.03f), -item.right);
+        Place(AvatarIKGoal.RightHand, AvatarIKHint.RightElbow, low + item.right * (size.x / 2 + 0.03f), item.right);
     }
 
-    void Place(AvatarIKGoal goal, Vector3 position, Vector3 inward)
+    void Place(AvatarIKGoal goal, AvatarIKHint elbow, Vector3 position, Vector3 outward)
     {
         animator.SetIKPositionWeight(goal, weight);
-        animator.SetIKRotationWeight(goal, weight * 0.4f);
+        animator.SetIKRotationWeight(goal, 0f);
         animator.SetIKPosition(goal, position);
-        animator.SetIKRotation(goal, Quaternion.LookRotation(Vector3.up, -inward));
+        animator.SetIKHintPositionWeight(elbow, weight);
+        animator.SetIKHintPosition(elbow, transform.position + Vector3.up * 1.2f + outward * 0.9f);
     }
 }
