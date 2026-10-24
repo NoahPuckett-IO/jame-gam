@@ -167,6 +167,7 @@ static partial class GroceryStoreBuilder
         Object.DestroyImmediate(player.GetComponent<CapsuleCollider>());
         player.GetComponent<Renderer>().sharedMaterial = playerMat;
         var controller = player.AddComponent<PlayerController>();
+        AddHenry(player, controller);
         player.AddComponent<PlayerInteractor>();
         Undo.RegisterCreatedObjectUndo(player, "Build Grocery Store");
 
@@ -174,7 +175,14 @@ static partial class GroceryStoreBuilder
         var walkways = new List<float>();
         for (int w = 0; w <= AisleCount; w++)
             walkways.Add(aislesRight - WalkwayWidth / 2 - w * (shelf.gondolaDepth + WalkwayWidth));
-        BuildLevelOne(store.transform, walkways, aisleLength, depth);
+        BuildLevelOne(store.transform, walkways, aisleLength, depth, spawn.position);
+
+        // Menu backdrop: the camera starts low behind the spawn, looking up the first towering hall.
+        if (Camera.main != null)
+        {
+            Undo.RecordObject(Camera.main.transform, "Build Grocery Store");
+            Camera.main.transform.SetPositionAndRotation(spawn.position + new Vector3(-4f, 2.5f, -10f), Quaternion.Euler(-8f, 8f, 0f));
+        }
 
         AddGrime(store.transform, left, right, depth);
         MakeProductsMatte(store.transform);
@@ -190,6 +198,36 @@ static partial class GroceryStoreBuilder
 
         EditorSceneManager.MarkSceneDirty(player.scene);
         Selection.activeGameObject = player;
+    }
+
+    // Swaps the placeholder capsule's looks for Henry (Kenney Mini Characters, CC0), sized to the
+    // 2-unit CharacterController with his feet on its bottom, and wires up his animations.
+    static void AddHenry(GameObject player, PlayerController controller)
+    {
+        CharacterSetup.EnsureImport();
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(CharacterSetup.ModelPath);
+        if (prefab == null) return;
+
+        Object.DestroyImmediate(player.GetComponent<MeshRenderer>());
+        Object.DestroyImmediate(player.GetComponent<MeshFilter>());
+
+        var model = (GameObject)PrefabUtility.InstantiatePrefab(prefab, player.transform);
+        model.name = "Henry";
+        model.transform.localPosition = Vector3.zero;
+        var b = GetBounds(model);
+        model.transform.localScale *= 2f / b.size.y;
+        b = GetBounds(model);
+        model.transform.position += Vector3.up * (player.transform.position.y - 1f - b.min.y);
+
+        var animator = model.GetComponent<Animator>();
+        if (animator == null) animator = model.AddComponent<Animator>();
+        animator.runtimeAnimatorController = CharacterSetup.BuildController(prefab);
+        animator.applyRootMotion = false;
+        animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+        foreach (var r in model.GetComponentsInChildren<Renderer>())
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+
+        player.AddComponent<PlayerAnimator>().Setup(animator, controller.WalkSpeed, controller.SprintSpeed);
     }
 
     // West wall with a big doorway in the middle, sliding glass doors, and bright daylight outside.

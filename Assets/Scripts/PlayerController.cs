@@ -18,8 +18,8 @@ public class PlayerController : MonoBehaviour
     [Header("Camera")]
     [Tooltip("Defaults to Camera.main.")]
     [SerializeField] Transform cam;
-    [SerializeField] float cameraDistance = 5f;
-    [SerializeField] float cameraHeight = 1.5f;
+    [SerializeField] float cameraDistance = 7.5f;
+    [SerializeField] float cameraHeight = 2.6f;
     [SerializeField] float lookSensitivity = 0.15f;
     [SerializeField] float minPitch = -40f, maxPitch = 70f;
 
@@ -38,6 +38,13 @@ public class PlayerController : MonoBehaviour
     Vector3 scriptedMove;
 
     public bool IsGrounded => controller != null && controller.isGrounded;
+    public float WalkSpeed => walkSpeed;
+    public float SprintSpeed => sprintSpeed;
+    public event System.Action Jumped;
+
+    // Briefly holds the player still, e.g. while bending down to pick something up.
+    float lockedUntil;
+    public void LockMovement(float seconds) => lockedUntil = Time.time + seconds;
     public float Yaw => yaw;
     public float Pitch => pitch;
 
@@ -124,7 +131,7 @@ public class PlayerController : MonoBehaviour
             pitch = Mathf.Clamp(pitch - look.y, minPitch, maxPitch);
 
             // Movement is relative to the camera's facing, flattened onto the ground.
-            Vector2 input = moveAction.ReadValue<Vector2>();
+            Vector2 input = Time.time < lockedUntil ? Vector2.zero : moveAction.ReadValue<Vector2>();
             moveDir = Quaternion.Euler(0f, yaw, 0f) * new Vector3(input.x, 0f, input.y);
             speed = sprintAction.IsPressed() ? sprintSpeed : walkSpeed;
         }
@@ -140,8 +147,11 @@ public class PlayerController : MonoBehaviour
             // Small downward push keeps isGrounded stable on slopes.
             verticalVelocity = -2f;
 
-            if (!InCutscene && jumpAction.WasPressedThisFrame())
+            if (!InCutscene && Time.time >= lockedUntil && jumpAction.WasPressedThisFrame())
+            {
                 verticalVelocity = Mathf.Sqrt(jumpHeight * -2f * gravity);
+                Jumped?.Invoke();
+            }
         }
 
         verticalVelocity += gravity * Time.deltaTime;

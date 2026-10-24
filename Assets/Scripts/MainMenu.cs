@@ -24,6 +24,15 @@ public class MainMenu : MonoBehaviour
         player.enabled = true;
     }
 
+    public void Quit()
+    {
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
+    }
+
     public void OpenSettings() => settingsPanel.SetActive(true);
 
     public void CloseSettings() => settingsPanel.SetActive(false);

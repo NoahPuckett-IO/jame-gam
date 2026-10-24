@@ -55,7 +55,11 @@ static partial class GroceryStoreBuilder
         ["pizza"] = 0xe552, ["cart"] = 0xe8cc, ["store"] = 0xea12, ["apple"] = 0xea80, ["eco"] = 0xea35,
         ["soup"] = 0xe7d3, ["wine"] = 0xf1e8, ["tag"] = 0xe54e, ["star"] = 0xe838, ["savings"] = 0xe2eb,
         ["burger"] = 0xea61, ["grocery"] = 0xe547,
+        ["run"] = 0xe566, ["walk"] = 0xe536, ["balance"] = 0xeaf6, ["hand"] = 0xe769, ["stairs"] = 0xf1a9,
+        ["play"] = 0xe037, ["settings"] = 0xe8b8, ["close"] = 0xe5cd, ["game"] = 0xea28, ["bulb"] = 0xe0f0,
     };
+
+    public static string Glyph(string icon) => Icons.TryGetValue(icon, out int code) ? ((char)code).ToString() : "";
 
     static void MakeIcon(Transform parent, Vector3 pos, float yaw, string icon, float size, Color color)
     {

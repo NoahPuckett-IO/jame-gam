@@ -64,7 +64,6 @@ static partial class GroceryStoreBuilder
         float R(float a, float b) => a + (float)rng.NextDouble() * (b - a);
         var dirt = GrimeMaterial(GrimeKind.Dirt);
         var mold = GrimeMaterial(GrimeKind.Mold);
-        var stain = GrimeMaterial(GrimeKind.Stain);
         int layer = 0;
 
         // Floor: dirt patches and scuffs.
@@ -74,12 +73,21 @@ static partial class GroceryStoreBuilder
             Decal(root, dirt, new Vector3(R(left, right), 0.02f + (layer++ % 40) * 0.002f, R(-depth / 2, depth / 2)),
                 Quaternion.Euler(90, R(0, 360), 0), new Vector2(s, s * R(0.6f, 1.4f)));
         }
-        // Ceiling: brown water stains.
-        for (int i = 0; i < 45; i++)
+        // Ceiling: water damage in clusters (a leak spreads over neighbouring tiles), mixing six
+        // different stain shapes and tints so no two patches look alike.
+        var stains = new Material[StainVariants];
+        for (int v = 0; v < StainVariants; v++) stains[v] = StainMaterial(v);
+        for (int c = 0; c < 14; c++)
         {
-            float s = R(0.8f, 3f) * Scale;
-            Decal(root, stain, new Vector3(R(left, right), WallHeight - 0.02f - (layer++ % 40) * 0.002f, R(-depth / 2, depth / 2)),
-                Quaternion.Euler(-90, R(0, 360), 0), new Vector2(s, s));
+            var centre = new Vector2(R(left, right), R(-depth / 2, depth / 2));
+            int count = rng.Next(1, 5);
+            for (int i = 0; i < count; i++)
+            {
+                float s = (i == 0 ? R(1.6f, 3.6f) : R(0.5f, 1.6f)) * Scale;
+                var at = centre + new Vector2(R(-1f, 1f), R(-1f, 1f)) * (i == 0 ? 0 : 1.6f * Scale);
+                Decal(root, stains[rng.Next(StainVariants)], new Vector3(at.x, WallHeight - 0.02f - (layer++ % 40) * 0.002f, at.y),
+                    Quaternion.Euler(-90, R(0, 360), 0), new Vector2(s, s * R(0.65f, 1.35f)));
+            }
         }
         // Walls: mold rising from the floor and creeping down from the ceiling.
         var walls = new[]
@@ -171,6 +179,81 @@ static partial class GroceryStoreBuilder
         var mat = StoreAtmosphere.Glass($"Grime_{kind}", Color.white);
         mat.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(texPath));
         mat.SetFloat("_Smoothness", kind == GrimeKind.Mold ? 0.05f : 0.15f);
+        EditorUtility.SetDirty(mat);
+        return mat;
+    }
+
+    const int StainVariants = 6;
+
+    // Water stains on ceiling tiles: an irregular, domain-warped blob with several dark tide-mark
+    // rings, a paler bleached middle and the odd drip blot. Each variant has its own shape, ring
+    // count and tint, from yellowed to rusty to grey-brown.
+    static Material StainMaterial(int variant)
+    {
+        if (!AssetDatabase.IsValidFolder(GrimeFolder)) AssetDatabase.CreateFolder(MatFolder, "Grime");
+        string texPath = $"{GrimeFolder}/Stain_{variant}.png";
+        if (AssetDatabase.LoadAssetAtPath<Texture2D>(texPath) == null)
+        {
+            const int size = 512;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, true);
+            var rng = new System.Random(variant * 7919 + 13);
+            int seed = variant * 131 + 5;
+            Color[] tints =
+            {
+                new Color(0.55f, 0.42f, 0.2f), new Color(0.48f, 0.3f, 0.14f), new Color(0.42f, 0.38f, 0.3f),
+                new Color(0.6f, 0.48f, 0.25f), new Color(0.38f, 0.26f, 0.16f), new Color(0.5f, 0.4f, 0.32f),
+            };
+            var tint = tints[variant % tints.Length];
+            int rings = 2 + variant % 3;
+            float lumpiness = 0.25f + 0.08f * (variant % 4);
+            // A few extra blots around the main stain.
+            var blots = new List<Vector3>();
+            for (int i = 0; i < 3 + variant % 3; i++)
+            {
+                float a = (float)rng.NextDouble() * Mathf.PI * 2, d = 0.55f + (float)rng.NextDouble() * 0.25f;
+                blots.Add(new Vector3(Mathf.Cos(a) * d, Mathf.Sin(a) * d, 0.08f + (float)rng.NextDouble() * 0.1f));
+            }
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float u = (x / (float)size - 0.5f) * 2f, v = (y / (float)size - 0.5f) * 2f;
+                // Warp the coordinates so the outline is ragged, not a circle.
+                float wu = u + (Fbm(x / 70f, y / 70f, seed) - 0.5f) * lumpiness * 2f;
+                float wv = v + (Fbm(x / 70f + 9f, y / 70f + 4f, seed) - 0.5f) * lumpiness * 2f;
+                float r = Mathf.Sqrt(wu * wu + wv * wv) / 0.75f;
+                float fine = Fbm(x / 12f, y / 12f, seed + 3);
+
+                float fill = Mathf.Clamp01((1f - r) * 3f) * 0.22f;
+                float ringA = 0f;
+                for (int k = 0; k < rings; k++)
+                {
+                    float rr = 1f - k * (0.55f / rings);
+                    ringA = Mathf.Max(ringA, Mathf.Exp(-Mathf.Pow((r - rr) * (18f + k * 6f), 2f)) * (1f - k * 0.18f));
+                }
+                float blot = 0f;
+                foreach (var bl in blots)
+                {
+                    float br = Mathf.Sqrt((u - bl.x) * (u - bl.x) + (v - bl.y) * (v - bl.y)) / bl.z;
+                    blot = Mathf.Max(blot, Mathf.Clamp01(1f - br) * 0.5f + Mathf.Exp(-Mathf.Pow((br - 1f) * 6f, 2f)) * 0.4f);
+                }
+                float a = Mathf.Clamp01(fill + ringA * 0.85f + blot) * (0.75f + 0.25f * fine);
+                var c = Color.Lerp(tint * 1.15f, tint * 0.6f, Mathf.Clamp01(ringA + blot * 0.5f));
+                c.a = a;
+                tex.SetPixel(x, y, c);
+            }
+            System.IO.File.WriteAllBytes(texPath, tex.EncodeToPNG());
+            Object.DestroyImmediate(tex);
+            AssetDatabase.ImportAsset(texPath);
+            if (AssetImporter.GetAtPath(texPath) is TextureImporter ti)
+            {
+                ti.alphaIsTransparency = true;
+                ti.wrapMode = TextureWrapMode.Clamp;
+                ti.SaveAndReimport();
+            }
+        }
+        var mat = StoreAtmosphere.Glass($"Grime_Stain_{variant}", Color.white);
+        mat.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(texPath));
+        mat.SetFloat("_Smoothness", 0.05f);
         EditorUtility.SetDirty(mat);
         return mat;
     }
