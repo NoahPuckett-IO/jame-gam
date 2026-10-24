@@ -102,19 +102,26 @@ public class IntroCutscene : MonoBehaviour
         var dir = (pathStop.position - pathStart.position).normalized;
         float pathLen = Vector3.Distance(pathStart.position, pathStop.position);
         var root = woodsHenry.transform;
-        woodsHenry.applyRootMotion = true;
-        for (float t = 0; Vector3.Dot(root.position - pathStart.position, dir) < pathLen && t < 15f; t += Time.deltaTime)
+        var footL = woodsHenry.GetBoneTransform(HumanBodyBones.LeftFoot);
+        var footR = woodsHenry.GetBoneTransform(HumanBodyBones.RightFoot);
+        Vector3 prevL = footL.position - root.position, prevR = footR.position - root.position;
+        float walked = 0f;
+        for (float t = 0; walked < pathLen && t < 15f; t += Time.deltaTime)
         {
             yield return null;
-            var flat = root.position;
-            flat.y = pathStart.position.y;
-            root.position = flat;
+            var l = footL.position - root.position;
+            var r = footR.position - root.position;
+            float step = Mathf.Max(Vector3.Dot(prevL - l, dir), Vector3.Dot(prevR - r, dir));
+            prevL = l;
+            prevR = r;
+            if (step > 0f && step < 0.5f) walked += step;
+            if (t > 1.5f && walked < 0.3f) walked += 1.6f * Time.deltaTime;
+            root.position = pathStart.position + dir * Mathf.Min(walked, pathLen);
             cam.transform.position = root.position + camOffset;
             cam.transform.rotation = Quaternion.LookRotation(root.position + Vector3.up * 1.4f - cam.transform.position);
             ufo.position = Vector3.Lerp(ufo.position, ufoHover.position, Time.deltaTime * 0.6f);
         }
         woodsHenry.SetFloat("Speed", 0f);
-        woodsHenry.applyRootMotion = false;
 
         HenryLook(woodsHenry, ufo, 0f);
         for (float t = 0; t < 1.2f; t += Time.deltaTime)

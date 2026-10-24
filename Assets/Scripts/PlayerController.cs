@@ -157,10 +157,10 @@ public class PlayerController : MonoBehaviour
         bool grounded = controller.isGrounded;
         if (grounded && verticalVelocity <= 0f) airControl = false;
         bool steer = InCutscene || grounded || airControl;
-        if (steer && moveDir.sqrMagnitude > 0.01f)
+        if (moveDir.sqrMagnitude > 0.01f)
         {
             Quaternion target = Quaternion.LookRotation(new Vector3(moveDir.x, 0f, moveDir.z));
-            transform.rotation = Quaternion.RotateTowards(transform.rotation, target, turnSpeed * Time.deltaTime);
+            transform.rotation = Quaternion.RotateTowards(transform.rotation, target, (steer ? turnSpeed : turnSpeed * 0.25f) * Time.deltaTime);
         }
 
         if (controller.isGrounded && verticalVelocity <= 0f)
@@ -184,8 +184,13 @@ public class PlayerController : MonoBehaviour
         }
         else if (steer)
             planarVelocity = Vector3.Lerp(planarVelocity, moveDir * speed, 1f - Mathf.Exp(-t * Time.deltaTime));
-        else if (planarVelocity.magnitude > walkSpeed)
-            planarVelocity = Vector3.MoveTowards(planarVelocity, planarVelocity.normalized * walkSpeed, 40f * Time.deltaTime);
+        else
+        {
+            if (planarVelocity.magnitude > walkSpeed)
+                planarVelocity = Vector3.MoveTowards(planarVelocity, planarVelocity.normalized * walkSpeed, 40f * Time.deltaTime);
+            if (moveDir.sqrMagnitude > 0.01f)
+                planarVelocity = Vector3.Lerp(planarVelocity, moveDir * speed, 1f - Mathf.Exp(-AirControl * Time.deltaTime));
+        }
         knockback = Vector3.Lerp(knockback, Vector3.zero, 1f - Mathf.Exp(-4f * Time.deltaTime));
 
         if (platform != null && platform.gameObject.activeInHierarchy)
@@ -222,6 +227,7 @@ public class PlayerController : MonoBehaviour
     [Header("Traction")]
     [SerializeField] float traction = 22f;
     const float IceTraction = 1.6f;
+    const float AirControl = 2.5f;
     Vector3 planarVelocity, knockback;
     int iceZones;
 

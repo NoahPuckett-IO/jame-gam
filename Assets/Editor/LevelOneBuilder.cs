@@ -522,6 +522,40 @@ static partial class GroceryStoreBuilder
 
     static Text skipHint;
 
+    // white rectangle, square on top, rounded on the bottom two corners; nine-sliced
+    static Sprite BannerSprite()
+    {
+        const string path = "Assets/Settings/TutorialBanner.png";
+        if (!System.IO.File.Exists(path))
+        {
+            const int size = 96, r = 32;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float a = 1f;
+                if (y < r && (x < r || x >= size - r))
+                {
+                    float cx = x < r ? r : size - r - 1, d = Vector2.Distance(new Vector2(x, y), new Vector2(cx, r));
+                    a = Mathf.Clamp01(r - d + 0.5f);
+                }
+                tex.SetPixel(x, y, new Color(1, 1, 1, a));
+            }
+            System.IO.File.WriteAllBytes(path, tex.EncodeToPNG());
+            Object.DestroyImmediate(tex);
+            AssetDatabase.ImportAsset(path);
+        }
+        if (AssetImporter.GetAtPath(path) is TextureImporter ti && (ti.textureType != TextureImporterType.Sprite || ti.spriteBorder.x < 1f))
+        {
+            ti.textureType = TextureImporterType.Sprite;
+            ti.spriteBorder = new Vector4(32, 32, 32, 32);
+            ti.alphaIsTransparency = true;
+            ti.mipmapEnabled = false;
+            ti.SaveAndReimport();
+        }
+        return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+    }
+
     static void BuildTutorialHud()
     {
         var old = GameObject.Find("Tutorial HUD");
@@ -581,12 +615,11 @@ static partial class GroceryStoreBuilder
         var group = cardGroupGo.GetComponent<CanvasGroup>();
         group.interactable = group.blocksRaycasts = false;
 
-        var card = Rect("Card", cardGroupRt, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -140), new Vector2(980, 190));
-        Img(card, new Color(0.04f, 0.06f, 0.07f, 0.9f));
-        card.gameObject.AddComponent<Outline>().effectColor = new Color(accent.r, accent.g, accent.b, 0.35f);
-        Img(Rect("Accent", card, new Vector2(0, 0), new Vector2(0, 1), new Vector2(6, 0), new Vector2(10, -24)), accent);
-        var iconBg = Rect("Icon Circle", card, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(95, 0), new Vector2(120, 120));
-        Img(iconBg, new Color(accent.r, accent.g, accent.b, 0.15f));
+        var card = Rect("Card", cardGroupRt, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -95), new Vector2(980, 190));
+        var banner = Img(card, new Color(0.06f, 0.09f, 0.1f, 0.94f));
+        banner.sprite = BannerSprite();
+        banner.pixelsPerUnitMultiplier = 1f;
+        var iconBg = Rect("Icon", card, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(95, 0), new Vector2(120, 120));
         var icon = Txt(Rect("Icon", iconBg, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero), IconFont() ?? titleFont, 78, accent, TextAnchor.MiddleCenter);
         var title = Txt(Rect("Title", card, new Vector2(0, 1), new Vector2(1, 1), new Vector2(-40, -42), new Vector2(-420, 56)), titleFont, 48, Color.white, TextAnchor.MiddleLeft);
         title.rectTransform.pivot = new Vector2(0, 0.5f);
