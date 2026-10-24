@@ -75,41 +75,26 @@ static class MenuBuilder
         caption.rectTransform.anchoredPosition = new Vector2(0, 42);
         caption.rectTransform.sizeDelta = new Vector2(0, 60);
 
-        var settingsPanel = Rect("Settings Panel", root, Vector2.zero, Vector2.one).gameObject;
-        Img(settingsPanel.GetComponent<RectTransform>(), new Color(0, 0, 0, 0.7f)).sprite = null;
-        var card = Rect("Card", settingsPanel.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
-        card.sizeDelta = new Vector2(760, 520);
-        Img(card, new Color(0.06f, 0.09f, 0.1f, 0.97f));
-        card.gameObject.AddComponent<Outline>().effectColor = new Color(Accent.r, Accent.g, Accent.b, 0.4f);
-        var sTitle = Label("Settings Title", card, "SETTINGS", titleFont, 90, Color.white, TextAnchor.UpperCenter);
-        sTitle.rectTransform.anchorMin = new Vector2(0, 1);
-        sTitle.rectTransform.anchorMax = new Vector2(1, 1);
-        sTitle.rectTransform.anchoredPosition = new Vector2(0, -40);
-        sTitle.rectTransform.sizeDelta = new Vector2(0, 110);
-        var sBody = Label("Settings Body", card, "Volume, sensitivity and graphics options are coming soon.", bodyFont, 30, new Color(0.8f, 0.85f, 0.85f), TextAnchor.MiddleCenter);
-        Stretch(sBody.rectTransform);
-        sBody.rectTransform.offsetMin = new Vector2(60, 140);
-        sBody.rectTransform.offsetMax = new Vector2(-60, -160);
-        var back = MakeButton(card, "Back Button", "BACK", GroceryStoreBuilderGlyph("close"), Vector2.zero, primary: true);
-        var backRt = (RectTransform)back.transform;
-        backRt.anchorMin = backRt.anchorMax = new Vector2(0.5f, 0);
-        backRt.pivot = new Vector2(0.5f, 0);
-        backRt.anchoredPosition = new Vector2(0, 50);
-        settingsPanel.SetActive(false);
-
         var menu = canvasGo.AddComponent<MainMenu>();
         var so = new SerializedObject(menu);
-        so.FindProperty("settingsPanel").objectReferenceValue = settingsPanel;
         so.FindProperty("player").objectReferenceValue = player;
         so.FindProperty("spawnPoint").objectReferenceValue = spawn;
         so.FindProperty("stage").objectReferenceValue = stage;
         so.ApplyModifiedPropertiesWithoutUndo();
 
+        play.GetComponent<MenuButtonFx>().Setup(MenuButtonFx.Sound.Confirm);
+        quit.GetComponent<MenuButtonFx>().Setup(MenuButtonFx.Sound.Back);
         UnityEventTools.AddPersistentListener(play.onClick, menu.Play);
         UnityEventTools.AddPersistentListener(settings.onClick, menu.OpenSettings);
         UnityEventTools.AddPersistentListener(quit.onClick, menu.Quit);
-        UnityEventTools.AddPersistentListener(back.onClick, menu.CloseSettings);
         events.GetComponent<EventSystem>().firstSelectedGameObject = play.gameObject;
+
+        var ui = new GameObject("UI Systems");
+        Undo.RegisterCreatedObjectUndo(ui, "Build Menu");
+        AudioClip Ui(string n) => AssetDatabase.LoadAssetAtPath<AudioClip>($"Assets/Audio/UI/{n}.ogg");
+        ui.AddComponent<UiSounds>().Setup(Ui("select_001"), Ui("click_002"), Ui("confirmation_001"), Ui("back_002"), Ui("open_001"));
+        ui.AddComponent<SettingsPanel>().Setup(titleFont, bodyFont, rounded, AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd"));
+        ui.AddComponent<PauseMenu>();
     }
 
     static string GroceryStoreBuilderGlyph(string name) => GroceryStoreBuilder.Glyph(name);

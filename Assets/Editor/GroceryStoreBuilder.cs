@@ -54,7 +54,7 @@ static partial class GroceryStoreBuilder
             return;
         }
 
-        foreach (var name in new[] { "Store", "Player", "Cube", "Main Menu", "EventSystem" })
+        foreach (var name in new[] { "Store", "Player", "Cube", "Main Menu", "EventSystem", "UI Systems" })
         {
             var old = GameObject.Find(name);
             if (old != null) Undo.DestroyObjectImmediate(old);
@@ -906,7 +906,6 @@ static partial class GroceryStoreBuilder
         root.SetParent(store);
         var rng = new System.Random(11);
         float Rand(float a, float b) => a + (float)rng.NextDouble() * (b - a);
-        float box = 0.45f * Scale;
 
         for (int i = 0; i < aisles.Count; i++)
         {
@@ -923,39 +922,12 @@ static partial class GroceryStoreBuilder
             blocker.transform.SetParent(pile);
             blocker.transform.position = new Vector3(ax, WallHeight / 2, zMid);
             blocker.size = new Vector3(shelf.gondolaDepth, WallHeight, spanZ);
-
-            int nx = Mathf.CeilToInt(shelf.gondolaDepth / box), nz = Mathf.CeilToInt(spanZ / box);
-            var openTops = new List<Bounds>();
-            for (int gx = 0; gx < nx; gx++)
-            for (int gz = 0; gz < nz; gz++)
-            {
-                float x = ax - shelf.gondolaDepth / 2 + (gx + 0.5f) * shelf.gondolaDepth / nx + Rand(-0.08f, 0.08f) * box;
-                float z = zMid - spanZ / 2 + (gz + 0.5f) * spanZ / nz + Rand(-0.08f, 0.08f) * box;
-                int height = rng.Next(1, 5);
-                float y = 0;
-                for (int h = 0; h < height; h++)
-                {
-                    bool isOpen = h == height - 1 && rng.NextDouble() < 0.5;
-                    var b = SpawnSized(isOpen ? open : closed, pile, box * Rand(0.85f, 1.05f), Rand(-25f, 25f));
-                    PlaceOnFloor(b, new Vector3(x + Rand(-0.06f, 0.06f) * box, y, z + Rand(-0.06f, 0.06f) * box));
-                    AddBoxColliders(b);
-                    var bb = GetBounds(b);
-                    y = bb.max.y;
-                    if (isOpen) openTops.Add(bb);
-                }
-                if (rng.NextDouble() < 0.15)
-                {
-                    var fallen = SpawnSized(closed, pile, box * 0.9f, Rand(0f, 360f));
-                    fallen.transform.Rotate(Rand(60f, 90f), 0, 0, Space.World);
-                    PlaceOnFloor(fallen, new Vector3(x + Rand(-1f, 1f) * box, 0, z + Rand(-0.5f, 0.5f) * box));
-                    AddBoxColliders(fallen);
-                    SettleLater(fallen);
-                }
-            }
+            blocker.gameObject.layer = 2;
 
             var stock = Stock[Mathf.Min(i, Stock.Length - 1)];
             var types = stock.Select(s => (prefab: LoadModel(s.model), s.size)).Where(t => t.prefab != null)
                 .Select(t => MeasureProduct(t.prefab, t.size)).ToList();
+            BoxPile(pile, ax - shelf.gondolaDepth / 2, ax + shelf.gondolaDepth / 2, zMid - spanZ / 2, zMid + spanZ / 2, rng, types);
             if (types.Count == 0) continue;
 
             GameObject Item(Vector3 at, bool tumble)
@@ -969,11 +941,6 @@ static partial class GroceryStoreBuilder
                 if (at.y <= 0.01f) SettleLater(p);
                 return p;
             }
-
-            foreach (var top in openTops)
-                for (int k = rng.Next(2, 5); k > 0; k--)
-                    Item(new Vector3(top.center.x + Rand(-0.3f, 0.3f) * top.size.x, top.max.y - top.size.y * Rand(0.2f, 0.5f),
-                        top.center.z + Rand(-0.3f, 0.3f) * top.size.z), tumble: true);
 
             for (int k = rng.Next(10, 18); k > 0; k--)
             {

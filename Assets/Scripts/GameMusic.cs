@@ -30,7 +30,7 @@ public class GameMusic : MonoBehaviour
     {
         bool playing = KeepPlaying || player != null && player.enabled && !player.InCutscene && !player.CameraLocked
                        && (intro == null || !intro.Running);
-        float target = playing ? volume : 0f;
+        float target = playing ? volume * GameSettings.Music : 0f;
         source.volume = Mathf.MoveTowards(source.volume, target, volume / fadeSeconds * Time.unscaledDeltaTime);
 
         if (playing && !source.isPlaying)

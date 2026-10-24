@@ -21,6 +21,16 @@ static class DebugSnapshots
 
     static System.Collections.Generic.IEnumerable<(string, Vector3, Vector3)> Shots()
     {
+        var blocker = Find("Blocker");
+        if (blocker != null)
+        {
+            var p = blocker.position;
+            p.y = 0f;
+            yield return ("pile_a", p + new Vector3(26f, 10f, p.z < 0 ? 30f : -30f), p + Vector3.up * 5f);
+            yield return ("pile_b", p + new Vector3(-26f, 8f, p.z < 0 ? 22f : -22f), p + Vector3.up * 5f);
+        }
+        var lane = Find("Lane Pole");
+        if (lane != null) yield return ("lanes", lane.position + new Vector3(30f, 4f, -40f), lane.position + Vector3.up * 6f);
         var vac = Find("VAC-3000");
         if (vac != null)
         {

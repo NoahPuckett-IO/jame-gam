@@ -87,7 +87,7 @@ public class PlayerSounds : MonoBehaviour
         int k = Pick(steps.Length, ref lastStepClip);
         source.pitch = Random.Range(0.92f, 1.1f);
         float v = stepVolume * loudness * Mathf.Lerp(0.85f, 1f, Mathf.InverseLerp(4f, 22f, speed));
-        source.PlayOneShot(steps[k], v);
+        source.PlayOneShot(steps[k], v * GameSettings.Sfx);
     }
 
     public void Grunt()
@@ -96,7 +96,7 @@ public class PlayerSounds : MonoBehaviour
         lastGrunt = Time.time;
         int k = Pick(grunts.Length, ref lastGruntClip);
         source.pitch = Random.Range(1.0f, 1.12f);
-        source.PlayOneShot(grunts[k], gruntVolume);
+        source.PlayOneShot(grunts[k], gruntVolume * GameSettings.Sfx);
     }
 
     static int Pick(int count, ref int last)

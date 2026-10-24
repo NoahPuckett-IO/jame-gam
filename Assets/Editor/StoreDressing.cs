@@ -435,8 +435,9 @@ static partial class GroceryStoreBuilder
             }
             if (snacks.Count > 0) SetOnTop(counter, root, snacks, rng, new Vector3(b.max.x - b.size.x * 0.12f, 0, b.center.z), b.size.x * 0.12f, rng.Next(4, 8));
             float poleH = Mathf.Max(CoolerHeight * 0.85f, b.max.y + 0.8f * Scale);
-            var poleAt = new Vector3(b.max.x - 0.08f * Scale, b.max.y, b.center.z);
-            Box("Lane Pole", root, poleAt + Vector3.up * (poleH - b.max.y) / 2, new Vector3(0.04f * Scale, poleH - b.max.y, 0.04f * Scale), pole);
+            var poleAt = new Vector3(b.max.x + 0.1f * Scale, 0f, b.center.z);
+            Box("Lane Pole", root, poleAt + Vector3.up * poleH / 2, new Vector3(0.05f * Scale, poleH, 0.05f * Scale), pole);
+            Box("Lane Pole Foot", root, poleAt + Vector3.up * 0.15f, new Vector3(0.22f * Scale, 0.3f, 0.22f * Scale), pole);
             BacklitSign(root, new Vector3(poleAt.x, poleH + 0.15f * Scale, poleAt.z), Vector3.right, 0.35f * Scale, 0.3f * Scale,
                 (lane++).ToString(), new Color(0.1f, 0.55f, 0.3f), twoSided: true);
             if (groceries.Count > 0) SetOnTop(counter, root, groceries, rng, new Vector3(b.center.x + b.size.x * 0.15f, 0, b.center.z), b.size.x * 0.4f, rng.Next(3, 7));

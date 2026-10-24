@@ -28,7 +28,9 @@ public class PlayerInteractor : MonoBehaviour
     void Update()
     {
         if (player.InCutscene || busy || !player.IsGrounded) return;
-        bool pressed = interact.WasPressedThisFrame() || (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame);
+        bool pressed = false;
+        foreach (var c in interact.controls)
+            if (c is UnityEngine.InputSystem.Controls.ButtonControl b && b.wasPressedThisFrame) pressed = true;
         if (!pressed) return;
 
         if (held != null)
@@ -86,7 +88,7 @@ public class PlayerInteractor : MonoBehaviour
         center.y = headTop + heldSize.y * 0.5f;
 
         var rot = transform.rotation;
-        var pos = center - rot * heldCenterOffset;
+        var pos = center - rot * Vector3.Scale(heldCenterOffset, held.transform.lossyScale);
         float k = Mathf.SmoothStep(0f, 1f, (Time.time - grabStart) / GlideTime);
         held.transform.SetPositionAndRotation(Vector3.Lerp(grabFrom, pos, k), Quaternion.Slerp(grabFromRot, rot, k));
     }

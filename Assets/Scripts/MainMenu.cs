@@ -2,7 +2,6 @@ using UnityEngine;
 
 public class MainMenu : MonoBehaviour
 {
-    [SerializeField] GameObject settingsPanel;
     [SerializeField] PlayerController player;
     [SerializeField] Transform spawnPoint;
     [SerializeField] GameObject stage;
@@ -10,7 +9,8 @@ public class MainMenu : MonoBehaviour
     void Start()
     {
         player.enabled = false;
-        settingsPanel.SetActive(false);
+        Time.timeScale = 1f;
+        AudioListener.pause = false;
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
     }
@@ -39,7 +39,12 @@ public class MainMenu : MonoBehaviour
 #endif
     }
 
-    public void OpenSettings() => settingsPanel.SetActive(true);
-
-    public void CloseSettings() => settingsPanel.SetActive(false);
+    public void OpenSettings()
+    {
+        var events = UnityEngine.EventSystems.EventSystem.current;
+        FindAnyObjectByType<SettingsPanel>()?.Open(() =>
+        {
+            if (events != null) events.SetSelectedGameObject(events.firstSelectedGameObject);
+        });
+    }
 }

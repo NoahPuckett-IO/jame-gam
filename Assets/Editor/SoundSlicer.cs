@@ -102,7 +102,7 @@ static class SoundSlicer
         return clips.ToArray();
     }
 
-    static void WriteWav(string path, float[] samples, int channels, int rate)
+    public static void WriteWav(string path, float[] samples, int channels, int rate)
     {
         using var w = new BinaryWriter(File.Create(path));
         int bytes = samples.Length * 2;

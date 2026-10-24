@@ -100,24 +100,7 @@ static partial class GroceryStoreBuilder
         float zLo = Mathf.Min(z0, z1), zHi = Mathf.Max(z0, z1);
         Seal(root, name + " Seal", new Vector3((x0 + x1) / 2, WallHeight / 2, (zLo + zHi) / 2), new Vector3(x1 - x0, WallHeight, zHi - zLo));
         seal = root.GetChild(root.childCount - 1).GetComponent<Collider>();
-        var crate = LoadKenney("cardboardBoxClosed");
-        if (crate == null) return root;
-        var rng = new System.Random(name.Length * 31);
-        float size = 0.45f * Scale;
-        int nx = Mathf.Max(1, Mathf.FloorToInt((x1 - x0) / size)), nz = Mathf.Max(1, Mathf.FloorToInt((zHi - zLo) / size));
-        for (int i = 0; i < nx; i++)
-        for (int j = 0; j < nz; j++)
-        {
-            float y = 0;
-            int h = rng.Next(2, 5);
-            for (int k = 0; k < h; k++)
-            {
-                var b = SpawnSized(crate, root, size * 0.95f, rng.Next(-12, 12));
-                PlaceOnFloor(b, new Vector3(x0 + (i + 0.5f) * (x1 - x0) / nx, y, zLo + (j + 0.5f) * (zHi - zLo) / nz));
-                AddBoxColliders(b);
-                y = GetBounds(b).max.y;
-            }
-        }
+        BoxPile(root, x0, x1, zLo, zHi, new System.Random(name.Length * 31), null);
         return root;
     }
 

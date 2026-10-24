@@ -139,7 +139,7 @@ public class PlayerController : MonoBehaviour
         }
         else
         {
-            Vector2 look = lookAction.ReadValue<Vector2>() * lookSensitivity;
+            Vector2 look = lookAction.ReadValue<Vector2>() * lookSensitivity * GameSettings.Sensitivity;
             yaw += look.x;
             pitch = Mathf.Clamp(pitch - look.y, minPitch, maxPitch);
 

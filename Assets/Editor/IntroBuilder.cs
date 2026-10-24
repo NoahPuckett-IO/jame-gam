@@ -192,6 +192,12 @@ static partial class GroceryStoreBuilder
             new[] { pathStart, pathStop, ufo, hover, beam, camWalk, camLookUp, camBeam },
             new[] { henrySpot, alien, gunPivot, muzzle, camShip },
             zap, flash, player, wakeInside, wakeOutside, skipHint);
+        AudioClip A(string n) => AssetDatabase.LoadAssetAtPath<AudioClip>($"Assets/Audio/Intro/{n}.ogg");
+        intro.SetSounds(new[]
+        {
+            ProceduralAudio.NightAmbience(), A("spaceEngineLow_000"), A("spaceEngineLarge_001"), A("forceField_001"), A("thrusterFire_002"),
+            A("computerNoise_001"), A("doorOpen_001"), A("laserRetro_004"), A("laserLarge_002"), A("forceField_004"),
+        });
     }
 
     static Transform BuildAlien(Transform alien, Vector3 aimAt, out Transform muzzle)

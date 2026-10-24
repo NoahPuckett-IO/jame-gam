@@ -417,6 +417,7 @@ public class RoombaBoss : MonoBehaviour
         if (gate == null) return;
         foreach (var c in gate.GetComponentsInChildren<Collider>())
         {
+            if (c == gateSeal) continue;
             var body = c.attachedRigidbody != null ? c.attachedRigidbody : c.gameObject.AddComponent<Rigidbody>();
             body.isKinematic = false;
             body.mass = 2f;

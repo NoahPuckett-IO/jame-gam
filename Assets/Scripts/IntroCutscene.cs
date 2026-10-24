@@ -17,6 +17,12 @@ public class IntroCutscene : MonoBehaviour
     [SerializeField] Transform boxInside, boxOutside, storeSpawn;
     [SerializeField] Text skipHint;
 
+    [Header("Sound")]
+    [SerializeField] AudioClip night;
+    [SerializeField] AudioClip ufoHum, ufoArrive, beamHum, zipAway, shipHum, gunRaise, zapSmall, zapBig, shrink;
+
+    AudioSource ambience, hum, beamLoop, shipLoop, oneShots;
+
     Camera cam;
     bool skipping, running;
     Light[] lights;
@@ -43,8 +49,72 @@ public class IntroCutscene : MonoBehaviour
         {
             skipping = true;
             StopAllCoroutines();
+            StopSounds();
             StartCoroutine(Finish(true));
         }
+    }
+
+    AudioSource Loop(AudioClip clip, float volume, Transform follow)
+    {
+        if (clip == null) return null;
+        var go = new GameObject(clip.name);
+        go.transform.SetParent(follow != null ? follow : transform, false);
+        var s = go.AddComponent<AudioSource>();
+        s.clip = clip;
+        s.loop = true;
+        s.volume = volume * GameSettings.Sfx;
+        if (follow != null)
+        {
+            s.spatialBlend = 0.7f;
+            s.minDistance = 20f;
+            s.maxDistance = 400f;
+        }
+        s.Play();
+        return s;
+    }
+
+    void Once(AudioClip clip, float volume)
+    {
+        if (clip == null) return;
+        if (oneShots == null)
+        {
+            oneShots = gameObject.AddComponent<AudioSource>();
+            oneShots.playOnAwake = false;
+        }
+        oneShots.PlayOneShot(clip, volume * GameSettings.Sfx);
+    }
+
+    static void Stop(ref AudioSource s)
+    {
+        if (s != null) Destroy(s.gameObject);
+        s = null;
+    }
+
+    IEnumerator FadeOut(AudioSource s, float seconds)
+    {
+        if (s == null) yield break;
+        float from = s.volume;
+        for (float t = 0; t < seconds && s != null; t += Time.deltaTime)
+        {
+            s.volume = from * (1f - t / seconds);
+            yield return null;
+        }
+        if (s != null) Destroy(s.gameObject);
+    }
+
+    void StopSounds()
+    {
+        Stop(ref ambience);
+        Stop(ref hum);
+        Stop(ref beamLoop);
+        Stop(ref shipLoop);
+        if (oneShots != null) oneShots.Stop();
+    }
+
+    public void SetSounds(AudioClip[] clips)
+    {
+        night = clips[0]; ufoHum = clips[1]; ufoArrive = clips[2]; beamHum = clips[3]; zipAway = clips[4];
+        shipHum = clips[5]; gunRaise = clips[6]; zapSmall = clips[7]; zapBig = clips[8]; shrink = clips[9];
     }
 
     void CamTo(Transform at)
@@ -94,6 +164,9 @@ public class IntroCutscene : MonoBehaviour
         woodsHenry.transform.SetPositionAndRotation(pathStart.position, pathStart.rotation);
         woodsHenry.SetFloat("Speed", 4f);
         ufo.position = ufoHover.position + Vector3.up * 60f + ufoHover.right * 40f;
+        ambience = Loop(night, 0.55f, null);
+        hum = Loop(ufoHum, 1f, ufo);
+        Once(ufoArrive, 0.7f);
         beam.gameObject.SetActive(false);
         CamTo(camWalk);
         StartCoroutine(Fade(0f, 1.5f));
@@ -141,9 +214,11 @@ public class IntroCutscene : MonoBehaviour
             beam.localScale = new Vector3(s, 1f, s);
             yield return null;
         }
+        beamLoop = Loop(beamHum, 0.8f, null);
         woodsHenry.CrossFadeInFixedTime("Flail", 0.2f);
         var steps = woodsHenry.GetComponent<PlayerSounds>();
         if (steps != null) steps.enabled = false;
+        if (steps != null) steps.Grunt();
         HenryLook(woodsHenry, ufo, 0f);
         CamTo(camBeam);
         var start = woodsHenry.transform.position;
@@ -161,6 +236,8 @@ public class IntroCutscene : MonoBehaviour
         }
         woodsHenry.gameObject.SetActive(false);
         beam.gameObject.SetActive(false);
+        Stop(ref beamLoop);
+        Once(zipAway, 1f);
         var away = ufo.position + ufoHover.right * -150f + Vector3.up * 60f;
         var ufoStart = ufo.position;
         for (float t = 0; t < 1f; t += Time.deltaTime)
@@ -169,6 +246,8 @@ public class IntroCutscene : MonoBehaviour
             cam.transform.rotation = Quaternion.Slerp(cam.transform.rotation, Quaternion.LookRotation(ufo.position - cam.transform.position), Time.deltaTime * 5f);
             yield return null;
         }
+        Stop(ref hum);
+        Stop(ref ambience);
         yield return Fade(1f, 0.5f);
 
         woodsHenry.gameObject.SetActive(true);
@@ -178,12 +257,14 @@ public class IntroCutscene : MonoBehaviour
         woodsHenry.CrossFadeInFixedTime("LookAround", 0f);
         HenryLook(woodsHenry, alien, 1f);
         CamTo(camShip);
+        shipLoop = Loop(shipHum, 0.4f, null);
         var gunRest = gun.localRotation;
         gun.localRotation = gunRest * Quaternion.Euler(50, 0, 0);
         zap.enabled = false;
         if (zapLight != null) zapLight.enabled = false;
         yield return Fade(0f, 0.6f);
         yield return new WaitForSeconds(0.7f);
+        Once(gunRaise, 0.6f);
         for (float t = 0; t < 1.2f; t += Time.deltaTime)
         {
             gun.localRotation = Quaternion.Slerp(gunRest * Quaternion.Euler(50, 0, 0), gunRest, Mathf.SmoothStep(0, 1, t / 1.2f));
@@ -193,6 +274,9 @@ public class IntroCutscene : MonoBehaviour
         yield return new WaitForSeconds(0.9f);
         zap.enabled = true;
         if (zapLight != null) zapLight.enabled = true;
+        Once(zapSmall, 0.9f);
+        Once(zapBig, 0.6f);
+        Once(shrink, 0.8f);
         woodsHenry.CrossFadeInFixedTime("Hit", 0.05f);
         var target = woodsHenry.transform.position + Vector3.up * 1.1f;
         for (float t = 0; t < 1.3f; t += Time.deltaTime)
@@ -209,6 +293,7 @@ public class IntroCutscene : MonoBehaviour
         zap.enabled = false;
         if (zapLight != null) zapLight.enabled = false;
         yield return new WaitForSeconds(0.6f);
+        StartCoroutine(FadeOut(shipLoop, 0.8f));
         yield return Fade(1f, 0.8f);
         woodsHenry.gameObject.SetActive(false);
         yield return new WaitForSeconds(1f);
