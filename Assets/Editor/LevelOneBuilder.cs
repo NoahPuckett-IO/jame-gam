@@ -21,7 +21,7 @@ static partial class GroceryStoreBuilder
 
         WakeUpBox(level, spawn.position, out wakeInside, out wakeOutside);
         TutorialZoneAt(level, new Vector3(xc, 5, spawn.position.z + 14f), new Vector3(w, 10, 24f), "walk", "WHERE AM I?",
-            "Walk with WASD, look with the mouse. Hold Shift to run and press Space to jump.", "WASD", "SHIFT", "SPACE");
+            "Walk with WASD and look with the mouse. Space jumps, and Shift does a quick dash that recharges in five seconds.", "WASD", "SHIFT", "SPACE");
 
         BuildSeesawPuzzle(level, xc, w, start + aisleLength * 0.3f);
         BuildStepPuzzle(level, xc, w, start + aisleLength * 0.52f);

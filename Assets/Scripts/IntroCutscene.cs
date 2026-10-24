@@ -90,6 +90,7 @@ public class IntroCutscene : MonoBehaviour
         playerAnim?.Play("Sit", 0f);
 
         woodsHenry.gameObject.SetActive(true);
+        woodsHenry.SetBool("Grounded", true);
         woodsHenry.transform.SetPositionAndRotation(pathStart.position, pathStart.rotation);
         woodsHenry.SetFloat("Speed", 4f);
         ufo.position = ufoHover.position + Vector3.up * 60f + ufoHover.right * 40f;
@@ -100,27 +101,20 @@ public class IntroCutscene : MonoBehaviour
         var camOffset = camWalk.position - pathStart.position;
         var dir = (pathStop.position - pathStart.position).normalized;
         float pathLen = Vector3.Distance(pathStart.position, pathStop.position);
-        var footL = woodsHenry.GetBoneTransform(HumanBodyBones.LeftFoot);
-        var footR = woodsHenry.GetBoneTransform(HumanBodyBones.RightFoot);
         var root = woodsHenry.transform;
-        Vector3 prevL = footL.position - root.position, prevR = footR.position - root.position;
-        float walked = 0f;
-        for (float t = 0; walked < pathLen && t < 15f; t += Time.deltaTime)
+        woodsHenry.applyRootMotion = true;
+        for (float t = 0; Vector3.Dot(root.position - pathStart.position, dir) < pathLen && t < 15f; t += Time.deltaTime)
         {
             yield return null;
-            var l = footL.position - root.position;
-            var r = footR.position - root.position;
-            float step = Vector3.Dot(footL.position.y < footR.position.y ? prevL - l : prevR - r, dir);
-            prevL = l;
-            prevR = r;
-            if (step > 0f && step < 0.5f) walked = Mathf.Min(pathLen, walked + step);
-            else if (t > 1.5f && step <= 0f) walked = Mathf.Min(pathLen, walked + 0.2f * Time.deltaTime);
-            root.position = pathStart.position + dir * walked;
+            var flat = root.position;
+            flat.y = pathStart.position.y;
+            root.position = flat;
             cam.transform.position = root.position + camOffset;
             cam.transform.rotation = Quaternion.LookRotation(root.position + Vector3.up * 1.4f - cam.transform.position);
             ufo.position = Vector3.Lerp(ufo.position, ufoHover.position, Time.deltaTime * 0.6f);
         }
         woodsHenry.SetFloat("Speed", 0f);
+        woodsHenry.applyRootMotion = false;
 
         HenryLook(woodsHenry, ufo, 0f);
         for (float t = 0; t < 1.2f; t += Time.deltaTime)
@@ -171,6 +165,7 @@ public class IntroCutscene : MonoBehaviour
         yield return Fade(1f, 0.5f);
 
         woodsHenry.gameObject.SetActive(true);
+        woodsHenry.SetBool("Grounded", true);
         woodsHenry.transform.localScale = Vector3.one;
         woodsHenry.transform.SetPositionAndRotation(shipHenrySpot.position, shipHenrySpot.rotation);
         woodsHenry.CrossFadeInFixedTime("LookAround", 0f);

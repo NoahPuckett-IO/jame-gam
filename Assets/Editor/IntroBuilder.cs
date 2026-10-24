@@ -95,6 +95,7 @@ static partial class GroceryStoreBuilder
         hAnim.cullingMode = AnimatorCullingMode.AlwaysAnimate;
         henry.AddComponent<HeadLook>();
         AddSounds(henry, hAnim);
+        AddGrounder(henry, hAnim, 0f);
         var moonFill = new GameObject("Henry Fill Light").AddComponent<Light>();
         moonFill.transform.SetParent(henry.transform, false);
         moonFill.transform.localPosition = new Vector3(0.8f, 2.6f, 2.2f) / henry.transform.localScale.y;

@@ -30,11 +30,9 @@ public class CarryIK : MonoBehaviour
     {
         if (item == null || weight <= 0.001f) return;
         var center = item.position + item.TransformVector(centerOffset);
-        float grip = Mathf.Min(0.35f, size.z * 0.35f);
-        var back = center - item.forward * (size.z / 2 - grip);
-        float up = -size.y * 0.1f;
-        Place(AvatarIKGoal.LeftHand, back - item.right * (size.x / 2 + 0.03f) + item.up * up, item.right);
-        Place(AvatarIKGoal.RightHand, back + item.right * (size.x / 2 + 0.03f) + item.up * up, -item.right);
+        var low = center - item.up * (size.y * 0.3f);
+        Place(AvatarIKGoal.LeftHand, low - item.right * (size.x / 2 + 0.03f), item.right);
+        Place(AvatarIKGoal.RightHand, low + item.right * (size.x / 2 + 0.03f), -item.right);
     }
 
     void Place(AvatarIKGoal goal, Vector3 position, Vector3 inward)
@@ -42,6 +40,6 @@ public class CarryIK : MonoBehaviour
         animator.SetIKPositionWeight(goal, weight);
         animator.SetIKRotationWeight(goal, weight * 0.4f);
         animator.SetIKPosition(goal, position);
-        animator.SetIKRotation(goal, Quaternion.LookRotation(item.forward, -inward));
+        animator.SetIKRotation(goal, Quaternion.LookRotation(Vector3.up, -inward));
     }
 }

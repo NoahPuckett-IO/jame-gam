@@ -38,7 +38,9 @@ static class CharacterSetup
                 {
                     string n = Short(c.name);
                     bool loop = Looping.Contains(n);
-                    if (c.loopTime != loop || !c.lockRootRotation || !c.keepOriginalPositionY || !c.keepOriginalOrientation || c.rotationOffset != 180f)
+                    bool walk = n == "Walk_Loop";
+                    if (c.loopTime != loop || !c.lockRootRotation || !c.keepOriginalPositionY || !c.keepOriginalOrientation || c.rotationOffset != 180f
+                        || c.lockRootPositionXZ == walk)
                     {
                         c.loopTime = loop;
                         c.lockRootRotation = true;
@@ -46,8 +48,8 @@ static class CharacterSetup
                         c.rotationOffset = 180f;
                         c.lockRootHeightY = true;
                         c.keepOriginalPositionY = true;
-                        c.lockRootPositionXZ = true;
-                        c.keepOriginalPositionXZ = true;
+                        c.lockRootPositionXZ = !walk;
+                        c.keepOriginalPositionXZ = !walk;
                         dirty = true;
                     }
                 }
@@ -91,6 +93,7 @@ static class CharacterSetup
         ctrl.AddParameter("Jump", AnimatorControllerParameterType.Trigger);
         ctrl.AddParameter("PickUp", AnimatorControllerParameterType.Trigger);
         ctrl.AddParameter("Hit", AnimatorControllerParameterType.Trigger);
+        ctrl.AddParameter("Dash", AnimatorControllerParameterType.Trigger);
 
         var sm = ctrl.layers[0].stateMachine;
 
@@ -116,6 +119,7 @@ static class CharacterSetup
         var jumpLand = State("JumpLand", "Jump_Land", 1.8f);
         var pick = State("PickUp", "PickUp_Table", 1.7f);
         var hit = State("Hit", "Hit_Chest", 1.3f);
+        var dash = State("Dash", "Roll", 2.4f);
         State("Crawl", "Crouch_Fwd_Loop");
         State("CrouchIdle", "Crouch_Idle_Loop");
         State("WakeUp", "Sitting_Exit");
@@ -148,6 +152,10 @@ static class CharacterSetup
         anyHit.duration = 0.05f;
         anyHit.AddCondition(AnimatorConditionMode.If, 0, "Hit");
         T(hit, move, 0.2f, exit: true, exitTime: 0.85f);
+        var anyDash = sm.AddAnyStateTransition(dash);
+        anyDash.duration = 0.05f;
+        anyDash.AddCondition(AnimatorConditionMode.If, 0, "Dash");
+        T(dash, move, 0.15f, exit: true, exitTime: 0.8f);
 
         var mask = new AvatarMask();
         for (int i = 0; i < (int)AvatarMaskBodyPart.LastBodyPart; i++)

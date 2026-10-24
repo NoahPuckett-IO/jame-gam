@@ -14,6 +14,7 @@ public class PlayerAnimator : MonoBehaviour
     static readonly int JumpId = Animator.StringToHash("Jump");
     static readonly int PickId = Animator.StringToHash("PickUp");
     static readonly int HitId = Animator.StringToHash("Hit");
+    static readonly int DashId = Animator.StringToHash("Dash");
 
     public Animator Animator => animator;
 
@@ -21,7 +22,11 @@ public class PlayerAnimator : MonoBehaviour
     {
         player = GetComponent<PlayerController>();
         lastPos = transform.position;
-        if (player != null) player.Jumped += () => animator.SetTrigger(JumpId);
+        if (player != null)
+        {
+            player.Jumped += () => animator.SetTrigger(JumpId);
+            player.Dashed += () => animator.SetTrigger(DashId);
+        }
     }
 
     void Update()

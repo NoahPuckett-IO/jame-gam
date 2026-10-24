@@ -11,6 +11,29 @@ public class FallingHitResponder : MonoBehaviour
         if (!busy) StartCoroutine(Run(away));
     }
 
+    public void Kill(Vector3 away)
+    {
+        if (!busy) StartCoroutine(Die(away));
+    }
+
+    IEnumerator Die(Vector3 away)
+    {
+        busy = true;
+        var player = GetComponent<PlayerController>();
+        var anim = GetComponent<PlayerAnimator>();
+        player.Knock(away * 14f + Vector3.up * 6f);
+        player.LockMovement(2.2f);
+        anim?.Play("Death", 0.1f);
+        PlayerController.Shake(0.5f);
+        yield return new WaitForSeconds(1.4f);
+        var fader = ScreenFader.Instance;
+        if (fader != null) yield return fader.Fade(1f, 0.3f);
+        player.Respawn();
+        anim?.Resume();
+        if (fader != null) yield return fader.Fade(0f, 0.4f);
+        busy = false;
+    }
+
     IEnumerator Run(Vector3 away)
     {
         busy = true;

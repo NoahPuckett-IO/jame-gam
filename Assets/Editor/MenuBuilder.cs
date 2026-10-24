@@ -47,16 +47,11 @@ static class MenuBuilder
         var sh = title.gameObject.AddComponent<Shadow>();
         sh.effectColor = new Color(0, 0, 0, 0.75f);
         sh.effectDistance = new Vector2(6, -8);
-        var underline = Rect("Underline", root, Vector2.zero, Vector2.zero);
-        Place(underline, new Vector2(144, 548), new Vector2(160, 8));
-        Img(underline, Accent);
 
         var play = MakeButton(root, "Play Button", "PLAY", GroceryStoreBuilderGlyph("play"), new Vector2(140, 410), primary: true);
         var settings = MakeButton(root, "Settings Button", "SETTINGS", GroceryStoreBuilderGlyph("settings"), new Vector2(140, 305), primary: false);
         var quit = MakeButton(root, "Quit Button", "QUIT", GroceryStoreBuilderGlyph("close"), new Vector2(140, 200), primary: false);
 
-        var footer = Label("Footer", root, "v0.1   •   WASD MOVE   •   SPACE JUMP   •   E PICK UP", bodyFont, 22, new Color(1, 1, 1, 0.45f), TextAnchor.LowerLeft);
-        Place(footer.rectTransform, new Vector2(140, 60), new Vector2(1100, 40));
 
         var frame = Rect("Character Frame", root, new Vector2(1, 0.5f), new Vector2(1, 0.5f));
         frame.pivot = new Vector2(1, 0.5f);
@@ -208,7 +203,6 @@ static class MenuBuilder
         var handler = new HumanPoseHandler(anim.avatar, anim.transform);
         var pose = new HumanPose();
         handler.GetHumanPose(ref pose);
-        for (int i = 0; i < pose.muscles.Length; i++) pose.muscles[i] = 0f;
         void Set(string muscle, float v)
         {
             int i = System.Array.IndexOf(HumanTrait.MuscleName, muscle);

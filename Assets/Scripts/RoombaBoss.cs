@@ -29,7 +29,7 @@ public class RoombaBoss : MonoBehaviour
     TutorialPopup popup;
     Mesh fanMesh;
     Vector3[] fanVerts;
-    float phaseTime, seenTime, chaseLeft, pauseLeft, spin = 35f;
+    float phaseTime, seenTime, chaseLeft, pauseLeft, spin = 35f, spinDir = 1f, nextFlip;
     Vector3 target;
     bool rampWest, hasTarget;
     const int Rays = 40;
@@ -116,7 +116,12 @@ public class RoombaBoss : MonoBehaviour
     void Scan()
     {
         spin = Mathf.Lerp(32f, 58f, phaseTime / scanSeconds);
-        transform.Rotate(0f, spin * Time.deltaTime, 0f);
+        if (Time.time > nextFlip)
+        {
+            spinDir = Random.value < 0.6f ? -spinDir : spinDir;
+            nextFlip = Time.time + Random.Range(1.5f, 4.5f);
+        }
+        transform.Rotate(0f, spin * spinDir * Time.deltaTime, 0f);
         bool seen = CanSee();
         SetFan(seen ? AlertColor : ScanColor);
         seenTime = seen ? seenTime + Time.deltaTime : 0f;
@@ -284,7 +289,7 @@ public class RoombaBoss : MonoBehaviour
     {
         var away = player.transform.position - transform.position;
         away.y = 0f;
-        player.GetComponent<FallingHitResponder>()?.Hit(away.normalized);
+        player.GetComponent<FallingHitResponder>()?.Kill(away.normalized);
         chaseLeft = 0f;
     }
 

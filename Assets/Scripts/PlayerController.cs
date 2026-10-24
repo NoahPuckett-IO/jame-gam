@@ -6,8 +6,10 @@ using UnityEngine.InputSystem;
 public class PlayerController : MonoBehaviour
 {
     [Header("Movement")]
-    [SerializeField] float walkSpeed = 14f;
-    [SerializeField] float sprintSpeed = 28f;
+    [SerializeField] float walkSpeed = 11.5f;
+    [SerializeField] float dashSpeed = 36f;
+    [SerializeField] float dashTime = 0.22f;
+    [SerializeField] float dashCooldown = 5f;
     [SerializeField] float turnSpeed = 720f;
     [SerializeField] float jumpHeight = 1.8f;
     [SerializeField] float gravity = -20f;
@@ -35,7 +37,11 @@ public class PlayerController : MonoBehaviour
 
     public bool IsGrounded => controller != null && controller.isGrounded;
     public float WalkSpeed => walkSpeed;
-    public float SprintSpeed => sprintSpeed;
+    public float DashReady => Mathf.Clamp01(1f - (dashReadyAt - Time.time) / dashCooldown);
+    public event System.Action Dashed;
+    float dashUntil, dashReadyAt;
+    Vector3 dashDir;
+    bool airControl;
     public event System.Action Jumped;
 
     float lockedUntil;
@@ -137,10 +143,21 @@ public class PlayerController : MonoBehaviour
 
             Vector2 input = Time.time < lockedUntil ? Vector2.zero : moveAction.ReadValue<Vector2>();
             moveDir = Quaternion.Euler(0f, yaw, 0f) * new Vector3(input.x, 0f, input.y);
-            speed = sprintAction.IsPressed() ? sprintSpeed : walkSpeed;
+            speed = walkSpeed;
+            if (sprintAction.WasPressedThisFrame() && Time.time >= dashReadyAt && Time.time >= lockedUntil)
+            {
+                dashDir = controller.isGrounded && moveDir.sqrMagnitude > 0.01f ? moveDir.normalized : transform.forward;
+                dashDir.y = 0f;
+                dashUntil = Time.time + dashTime;
+                dashReadyAt = Time.time + dashCooldown;
+                Dashed?.Invoke();
+            }
         }
 
-        if (moveDir.sqrMagnitude > 0.01f)
+        bool grounded = controller.isGrounded;
+        if (grounded && verticalVelocity <= 0f) airControl = false;
+        bool steer = InCutscene || grounded || airControl;
+        if (steer && moveDir.sqrMagnitude > 0.01f)
         {
             Quaternion target = Quaternion.LookRotation(new Vector3(moveDir.x, 0f, moveDir.z));
             transform.rotation = Quaternion.RotateTowards(transform.rotation, target, turnSpeed * Time.deltaTime);
@@ -160,7 +177,15 @@ public class PlayerController : MonoBehaviour
         verticalVelocity += gravity * Time.deltaTime;
 
         float t = InCutscene ? 30f : (iceZones > 0 ? IceTraction : traction);
-        planarVelocity = Vector3.Lerp(planarVelocity, moveDir * speed, 1f - Mathf.Exp(-t * Time.deltaTime));
+        if (!InCutscene && Time.time < dashUntil)
+        {
+            planarVelocity = dashDir.normalized * dashSpeed;
+            transform.rotation = Quaternion.LookRotation(dashDir);
+        }
+        else if (steer)
+            planarVelocity = Vector3.Lerp(planarVelocity, moveDir * speed, 1f - Mathf.Exp(-t * Time.deltaTime));
+        else if (planarVelocity.magnitude > walkSpeed)
+            planarVelocity = Vector3.MoveTowards(planarVelocity, planarVelocity.normalized * walkSpeed, 40f * Time.deltaTime);
         knockback = Vector3.Lerp(knockback, Vector3.zero, 1f - Mathf.Exp(-4f * Time.deltaTime));
 
         if (platform != null && platform.gameObject.activeInHierarchy)
@@ -207,6 +232,7 @@ public class PlayerController : MonoBehaviour
     public void Launch(float upSpeed)
     {
         verticalVelocity = upSpeed;
+        airControl = true;
         Jumped?.Invoke();
     }
 

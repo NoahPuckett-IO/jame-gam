@@ -42,7 +42,7 @@ static partial class GroceryStoreBuilder
         director.Setup(list.ToArray(), x, half, zN - 8f, zS + 8f, DashMaterial());
 
         TutorialZoneAt(root, new Vector3(x, 5, zN - 4f), new Vector3(WalkwayWidth, 10, 10f), "run", "RUN!",
-            "The shelves are giving way! Red outlines show where things are about to land. Keep moving and dodge them.", "SHIFT", "WASD");
+            "The shelves are giving way! Red outlines show where things are about to land. Keep moving, and save your dash for close calls.", "SHIFT", "WASD");
         CheckpointAt(root, "Checkpoint L4-A", new Vector3(x, 0, zN * 0.35f), new Vector3(WalkwayWidth, 4, 3), 180);
         CheckpointAt(root, "Checkpoint L4-B", new Vector3(x, 0, zS * 0.35f), new Vector3(WalkwayWidth, 4, 3), 180);
         ShelfGuards(root, x, zS, zN);

@@ -77,12 +77,9 @@ public class PlayerInteractor : MonoBehaviour
     void LateUpdate()
     {
         if (held == null) return;
-        float chestY = transform.position.y + 0.35f;
-        var chest = anim != null ? anim.Bone(HumanBodyBones.Chest) : null;
-        if (chest != null) chestY = chest.position.y;
-        float feet = transform.position.y - 1f;
-        var center = transform.position + transform.forward * (BodyRadius + heldSize.z * 0.5f);
-        center.y = Mathf.Max(chestY + 0.15f, feet + heldSize.y * 0.5f + 0.3f);
+        float headTop = transform.position.y + 1.12f;
+        var center = transform.position + transform.forward * 0.05f;
+        center.y = headTop + heldSize.y * 0.5f;
 
         var rot = transform.rotation;
         var pos = center - rot * heldCenterOffset;
@@ -90,7 +87,7 @@ public class PlayerInteractor : MonoBehaviour
         held.transform.SetPositionAndRotation(Vector3.Lerp(grabFrom, pos, k), Quaternion.Slerp(grabFromRot, rot, k));
     }
 
-    const float BodyRadius = 0.42f, GlideTime = 0.3f;
+    const float GlideTime = 0.35f;
     Vector3 heldCenterOffset, heldSize, grabFrom;
     Quaternion grabFromRot;
     float grabStart;

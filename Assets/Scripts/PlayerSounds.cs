@@ -25,7 +25,11 @@ public class PlayerSounds : MonoBehaviour
         source.playOnAwake = false;
         source.spatialBlend = 0f;
         player = GetComponent<PlayerController>();
-        if (player != null) player.Jumped += Grunt;
+        if (player != null)
+        {
+            player.Jumped += Grunt;
+            player.Dashed += Grunt;
+        }
         lastPos = transform.position;
     }
 

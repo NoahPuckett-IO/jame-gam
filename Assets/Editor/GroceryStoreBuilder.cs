@@ -188,6 +188,9 @@ static partial class GroceryStoreBuilder
 
         MenuBuilder.Build(controller, spawn);
         BuildMusic();
+        var hud = new GameObject("Dash HUD");
+        hud.transform.SetParent(store.transform);
+        hud.AddComponent<DashMeter>().Setup(AssetDatabase.LoadAssetAtPath<Font>("Assets/Fonts/BebasNeue-Regular.ttf"));
 
         if (Camera.main != null)
         {
@@ -229,6 +232,17 @@ static partial class GroceryStoreBuilder
     }
 
     static readonly List<(string, Vector3, float)> devWarps = new List<(string, Vector3, float)>();
+
+    public static void AddGrounder(GameObject model, Animator animator, float groundOffset)
+    {
+        var lf = animator.GetBoneTransform(HumanBodyBones.LeftFoot);
+        var rf = animator.GetBoneTransform(HumanBodyBones.RightFoot);
+        if (lf == null || rf == null) return;
+        var rs = model.GetComponentsInChildren<Renderer>();
+        var b = rs[0].bounds;
+        foreach (var r in rs) b.Encapsulate(r.bounds);
+        model.AddComponent<FootGrounder>().Setup(Mathf.Min(lf.position.y, rf.position.y) - b.min.y, groundOffset);
+    }
 
     public static void AddSounds(GameObject body, Animator animator)
     {
@@ -289,6 +303,7 @@ static partial class GroceryStoreBuilder
 
         player.AddComponent<PlayerAnimator>().Setup(animator);
         model.AddComponent<CarryIK>();
+        AddGrounder(model, animator, -1f - player.GetComponent<CharacterController>().skinWidth);
         AddSounds(player, animator);
         return model;
     }
