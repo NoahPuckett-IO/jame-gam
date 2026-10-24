@@ -3,105 +3,175 @@ using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
 
-// Henry, the player character: Kenney "Mini Characters" male D (CC0). Sets up the model's import
-// (generic rig, looping clips) and builds his Animator Controller:
+// Henry, the player character: Kenney "Animated Characters" medium model (CC0) wearing the
+// skaterMaleA skin, animated with Quaternius' "Universal Animation Library" (CC0) through Unity's
+// Humanoid retargeting.
 //
-//   Base layer:   Locomotion blend (idle → walk → sprint by Speed) ⇄ Jump → Fall → land,
-//                 and a one-shot PickUp state (used for both picking up and putting down).
-//   Arms layer:   "holding-both" on the arm bones only, weighted in while carrying.
+//   Base layer:  Locomotion blend (Idle → Walk → Jog → Sprint by ground speed),
+//                Jump start → loop → land, PickUp, Hit, plus named one-shots for cutscenes
+//                (Crawl, CrouchIdle, WakeUp, Flail, Push, Death).
+//   Arms layer:  an arms-forward pose (from Driving_Loop) on the arms and chest only, faded in
+//                while carrying so the box sits in his hands.
 static class CharacterSetup
 {
-    public const string ModelPath = "Assets/ThirdParty/KenneyCharacters/character-male-d.fbx";
-    const string ControllerPath = "Assets/ThirdParty/KenneyCharacters/Henry.controller";
-    const string MaskPath = "Assets/ThirdParty/KenneyCharacters/HenryArms.mask";
+    public const string ModelPath = "Assets/ThirdParty/KenneyAnimChar/characterMedium.fbx";
+    public const string SkinPath = "Assets/ThirdParty/KenneyAnimChar/Skins/skaterMaleA.png";
+    const string AnimPath = "Assets/ThirdParty/UAL/UAL1_Standard.fbx";
+    const string ControllerPath = "Assets/ThirdParty/KenneyAnimChar/Henry.controller";
+    const string MaskPath = "Assets/ThirdParty/KenneyAnimChar/HenryArms.mask";
+    const string MaterialPath = "Assets/ThirdParty/KenneyAnimChar/Henry.mat";
 
-    static readonly string[] Looping = { "idle", "walk", "sprint", "fall", "holding-both" };
+    static readonly string[] Looping =
+    {
+        "Idle_Loop", "Walk_Loop", "Jog_Fwd_Loop", "Sprint_Loop", "Jump_Loop", "Crouch_Fwd_Loop", "Crouch_Idle_Loop",
+        "Driving_Loop", "Swim_Fwd_Loop", "Swim_Idle_Loop", "Push_Loop", "Sitting_Idle_Loop", "Idle_Talking_Loop", "Dance_Loop",
+    };
 
     public static void EnsureImport()
     {
-        if (!(AssetImporter.GetAtPath(ModelPath) is ModelImporter importer)) return;
-        bool dirty = false;
-        if (importer.animationType != ModelImporterAnimationType.Generic)
+        foreach (var path in new[] { ModelPath, AnimPath })
         {
-            importer.animationType = ModelImporterAnimationType.Generic;
-            importer.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
-            dirty = true;
-        }
-        if (!importer.isReadable) { importer.isReadable = true; dirty = true; }
-
-        var clips = importer.clipAnimations.Length > 0 ? importer.clipAnimations : importer.defaultClipAnimations;
-        foreach (var c in clips)
-        {
-            bool loop = Looping.Contains(c.name) || Looping.Contains(c.takeName);
-            if (c.loopTime != loop) { c.loopTime = loop; dirty = true; }
-        }
-        if (dirty)
-        {
-            importer.clipAnimations = clips;
-            importer.SaveAndReimport();
+            if (!(AssetImporter.GetAtPath(path) is ModelImporter importer)) continue;
+            bool dirty = false;
+            if (importer.animationType != ModelImporterAnimationType.Human)
+            {
+                importer.animationType = ModelImporterAnimationType.Human;
+                importer.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
+                dirty = true;
+            }
+            if (path == ModelPath && !importer.isReadable) { importer.isReadable = true; dirty = true; }
+            if (path == AnimPath)
+            {
+                var clips = importer.clipAnimations.Length > 0 ? importer.clipAnimations : importer.defaultClipAnimations;
+                foreach (var c in clips)
+                {
+                    string n = Short(c.name);
+                    bool loop = Looping.Contains(n);
+                    if (c.loopTime != loop || !c.lockRootRotation || !c.keepOriginalPositionY || !c.keepOriginalOrientation || c.rotationOffset != 180f)
+                    {
+                        c.loopTime = loop;
+                        c.lockRootRotation = true;
+                        // Bake the root rotation from the file's own orientation ("Body Orientation" turned the
+                        // walk cycles sideways); the Quaternius rig faces backwards in it, hence the 180.
+                        c.keepOriginalOrientation = true;
+                        c.rotationOffset = 180f;
+                        c.lockRootHeightY = true;
+                        c.keepOriginalPositionY = true;
+                        c.lockRootPositionXZ = true;
+                        c.keepOriginalPositionXZ = true;
+                        dirty = true;
+                    }
+                }
+                if (dirty) importer.clipAnimations = clips;
+            }
+            if (dirty) importer.SaveAndReimport();
         }
     }
 
-    static AnimationClip Clip(string name) =>
-        AssetDatabase.LoadAllAssetsAtPath(ModelPath).OfType<AnimationClip>()
-            .FirstOrDefault(c => c.name == name && !c.name.StartsWith("__preview"));
+    static string Short(string clipName) => clipName.Contains("|") ? clipName.Substring(clipName.LastIndexOf('|') + 1) : clipName;
 
-    public static RuntimeAnimatorController BuildController(GameObject modelPrefab)
+    public static AnimationClip Clip(string name) =>
+        AssetDatabase.LoadAllAssetsAtPath(AnimPath).OfType<AnimationClip>()
+            .FirstOrDefault(c => Short(c.name) == name && !c.name.StartsWith("__preview"));
+
+    // Kenney's character uses a separate skin texture; give it a matte material with a touch of
+    // self-light so Henry reads clearly in the dark aisles.
+    public static Material HenryMaterial()
+    {
+        var mat = AssetDatabase.LoadAssetAtPath<Material>(MaterialPath);
+        if (mat == null)
+        {
+            mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            AssetDatabase.CreateAsset(mat, MaterialPath);
+        }
+        var skin = AssetDatabase.LoadAssetAtPath<Texture2D>(SkinPath);
+        mat.SetTexture("_BaseMap", skin);
+        mat.color = new Color(1.08f, 1.05f, 1.02f);
+        mat.SetFloat("_Smoothness", 0.18f);
+        mat.EnableKeyword("_EMISSION");
+        mat.SetTexture("_EmissionMap", skin);
+        mat.SetColor("_EmissionColor", new Color(0.22f, 0.22f, 0.22f));
+        EditorUtility.SetDirty(mat);
+        return mat;
+    }
+
+    public static RuntimeAnimatorController BuildController()
     {
         AssetDatabase.DeleteAsset(ControllerPath);
         var ctrl = AnimatorController.CreateAnimatorControllerAtPath(ControllerPath);
         ctrl.AddParameter("Speed", AnimatorControllerParameterType.Float);
         ctrl.AddParameter("Grounded", AnimatorControllerParameterType.Bool);
-        ctrl.AddParameter("VerticalSpeed", AnimatorControllerParameterType.Float);
         ctrl.AddParameter("Jump", AnimatorControllerParameterType.Trigger);
         ctrl.AddParameter("PickUp", AnimatorControllerParameterType.Trigger);
+        ctrl.AddParameter("Hit", AnimatorControllerParameterType.Trigger);
 
         var sm = ctrl.layers[0].stateMachine;
 
-        // Locomotion: Speed is 0 standing, 1 walking, 2 sprinting.
+        // Locomotion by ground speed in world units/second.
         var move = sm.AddState("Locomotion");
         var tree = new BlendTree { name = "Locomotion", blendParameter = "Speed", useAutomaticThresholds = false };
         AssetDatabase.AddObjectToAsset(tree, ctrl);
-        tree.AddChild(Clip("idle"), 0f);
-        tree.AddChild(Clip("walk"), 1f);
-        tree.AddChild(Clip("sprint"), 2f);
+        tree.AddChild(Clip("Idle_Loop"), 0f);
+        tree.AddChild(Clip("Walk_Loop"), 4f);
+        tree.AddChild(Clip("Jog_Fwd_Loop"), 11f);
+        tree.AddChild(Clip("Sprint_Loop"), 22f);
         move.motion = tree;
         sm.defaultState = move;
 
-        var jump = sm.AddState("Jump");
-        jump.motion = Clip("jump");
-        var fall = sm.AddState("Fall");
-        fall.motion = Clip("fall");
-        var pick = sm.AddState("PickUp");
-        pick.motion = Clip("pick-up");
-        pick.speed = 1.6f;
+        AnimatorState State(string name, string clip, float speed = 1f)
+        {
+            var s = sm.AddState(name);
+            s.motion = Clip(clip);
+            s.speed = speed;
+            return s;
+        }
+        var jumpStart = State("JumpStart", "Jump_Start", 1.6f);
+        var jumpLoop = State("JumpLoop", "Jump_Loop");
+        var jumpLand = State("JumpLand", "Jump_Land", 1.8f);
+        var pick = State("PickUp", "PickUp_Table", 1.7f);
+        var hit = State("Hit", "Hit_Chest", 1.3f);
+        // Named states the cutscenes cross-fade to directly.
+        State("Crawl", "Crouch_Fwd_Loop");
+        State("CrouchIdle", "Crouch_Idle_Loop");
+        State("WakeUp", "Sitting_Exit");
+        State("Sit", "Sitting_Idle_Loop");
+        State("Flail", "Swim_Fwd_Loop", 1.8f);
+        State("Push", "Push_Loop");
+        State("Death", "Death01");
+        State("LookAround", "Idle_Talking_Loop");
 
-        AnimatorStateTransition T(AnimatorState from, AnimatorState to, float duration, bool exit = false)
+        AnimatorStateTransition T(AnimatorState from, AnimatorState to, float duration, bool exit = false, float exitTime = 0.9f)
         {
             var t = from.AddTransition(to);
             t.duration = duration;
             t.hasExitTime = exit;
-            if (exit) t.exitTime = 0.85f;
+            if (exit) t.exitTime = exitTime;
             return t;
         }
 
-        T(move, jump, 0.08f).AddCondition(AnimatorConditionMode.If, 0, "Jump");
-        T(move, fall, 0.2f).AddCondition(AnimatorConditionMode.IfNot, 0, "Grounded");
-        T(jump, fall, 0.25f, exit: true);
-        T(jump, move, 0.12f).AddCondition(AnimatorConditionMode.If, 0, "Grounded");
-        var land = T(fall, move, 0.12f);
-        land.AddCondition(AnimatorConditionMode.If, 0, "Grounded");
+        T(move, jumpStart, 0.08f).AddCondition(AnimatorConditionMode.If, 0, "Jump");
+        T(move, jumpLoop, 0.25f).AddCondition(AnimatorConditionMode.IfNot, 0, "Grounded");
+        T(jumpStart, jumpLoop, 0.15f, exit: true, exitTime: 0.7f);
+        T(jumpStart, jumpLand, 0.1f).AddCondition(AnimatorConditionMode.If, 0, "Grounded");
+        T(jumpLoop, jumpLand, 0.08f).AddCondition(AnimatorConditionMode.If, 0, "Grounded");
+        T(jumpLand, move, 0.15f, exit: true, exitTime: 0.5f);
+        var landToMove = T(jumpLand, move, 0.1f);
+        landToMove.AddCondition(AnimatorConditionMode.Greater, 3f, "Speed");
         T(move, pick, 0.1f).AddCondition(AnimatorConditionMode.If, 0, "PickUp");
-        T(pick, move, 0.2f, exit: true);
+        T(pick, move, 0.2f, exit: true, exitTime: 0.8f);
+        var anyHit = sm.AddAnyStateTransition(hit);
+        anyHit.duration = 0.05f;
+        anyHit.AddCondition(AnimatorConditionMode.If, 0, "Hit");
+        T(hit, move, 0.2f, exit: true, exitTime: 0.85f);
 
-        // Arms layer for carrying.
+        // Arms layer for carrying: arms + chest only.
         var mask = new AvatarMask();
-        mask.AddTransformPath(modelPrefab.transform, true);
-        for (int i = 0; i < mask.transformCount; i++)
-        {
-            string path = mask.GetTransformPath(i);
-            mask.SetTransformActive(i, path.EndsWith("arm-left") || path.EndsWith("arm-right"));
-        }
+        for (int i = 0; i < (int)AvatarMaskBodyPart.LastBodyPart; i++)
+            mask.SetHumanoidBodyPartActive((AvatarMaskBodyPart)i, false);
+        mask.SetHumanoidBodyPartActive(AvatarMaskBodyPart.LeftArm, true);
+        mask.SetHumanoidBodyPartActive(AvatarMaskBodyPart.RightArm, true);
+        mask.SetHumanoidBodyPartActive(AvatarMaskBodyPart.LeftFingers, true);
+        mask.SetHumanoidBodyPartActive(AvatarMaskBodyPart.RightFingers, true);
         AssetDatabase.DeleteAsset(MaskPath);
         AssetDatabase.CreateAsset(mask, MaskPath);
 
@@ -114,9 +184,16 @@ static class CharacterSetup
         };
         AssetDatabase.AddObjectToAsset(arms.stateMachine, ctrl);
         var hold = arms.stateMachine.AddState("Hold");
-        hold.motion = Clip("holding-both");
+        hold.motion = Clip("Driving_Loop");
+        hold.speed = 0.2f; // nearly still: just a hint of the arms adjusting their grip
         arms.stateMachine.defaultState = hold;
         ctrl.AddLayer(arms);
+
+        // Look-at IK for cutscenes (HeadLook), and hand IK while carrying.
+        var layers = ctrl.layers;
+        layers[0].iKPass = true;
+        layers[1].iKPass = true; // CarryIK puts his hands on the sides of what he carries
+        ctrl.layers = layers;
 
         AssetDatabase.SaveAssets();
         return ctrl;

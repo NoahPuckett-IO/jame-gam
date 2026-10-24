@@ -1,41 +1,27 @@
-using System.Collections;
 using UnityEngine;
 
-// The fallen cereal box blocking the gap. When the seesaw tips, the ruler's long end jacks it up:
-// a fixed, eased animation (no physics) that leaves enough room to walk underneath.
-public class LiftedGate : MonoBehaviour
+// The fallen cereal box blocking the gap. It rests on the ruler's long end: as the ruler swings up,
+// the box rides up on the tip (tilting back a little), leaving room to walk underneath.
+public class LiftedGate : LeverLoad
 {
-    [SerializeField] float liftHeight = 3.8f;
-    [SerializeField] float tiltBack = -9f;
-    [SerializeField] float duration = 0.9f;
+    [SerializeField] float restBottom;  // world Y of the box's underside at rest
+    [SerializeField] float tiltPerUnit = -1.6f;
 
-    bool lifted;
+    Vector3 startPos;
+    Quaternion startRot;
 
-    public void Lift()
+    void Awake()
     {
-        if (lifted) return;
-        lifted = true;
-        StartCoroutine(Animate());
+        startPos = transform.position;
+        startRot = transform.rotation;
     }
 
-    IEnumerator Animate()
+    public override void OnTip(Vector3 tipTop)
     {
-        var startPos = transform.position;
-        var startRot = transform.rotation;
-        var endPos = startPos + Vector3.up * liftHeight;
-        var endRot = Quaternion.AngleAxis(tiltBack, Vector3.right) * startRot;
-        for (float t = 0; t < duration; t += Time.deltaTime)
-        {
-            // Ease out with a small overshoot, like it was flicked up and settled on the ruler.
-            float k = t / duration;
-            float e = 1f - Mathf.Pow(1f - k, 3f);
-            float bounce = Mathf.Sin(k * Mathf.PI) * 0.08f;
-            transform.SetPositionAndRotation(Vector3.LerpUnclamped(startPos, endPos, e + bounce),
-                Quaternion.SlerpUnclamped(startRot, endRot, e));
-            yield return null;
-        }
-        transform.SetPositionAndRotation(endPos, endRot);
+        float lift = Mathf.Max(0f, tipTop.y - restBottom);
+        transform.SetPositionAndRotation(startPos + Vector3.up * lift,
+            Quaternion.AngleAxis(lift * tiltPerUnit, Vector3.right) * startRot);
     }
 
-    public void Setup(float height) => liftHeight = height;
+    public void Setup(float bottomAtRest) => restBottom = bottomAtRest;
 }

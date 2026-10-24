@@ -5,12 +5,14 @@ using UnityEngine.InputSystem;
 // (Move, Look, Jump, Sprint). Mouse orbits the camera; the character turns to face
 // the direction it moves. Cutscenes can take over movement and the camera, and the player
 // respawns at the last checkpoint (R, or falling out of the world).
+// Runs after the things it can stand on (bobbing ice, moving plates, tipping planks) have moved.
+[DefaultExecutionOrder(100)]
 [RequireComponent(typeof(CharacterController))]
 public class PlayerController : MonoBehaviour
 {
     [Header("Movement")]
-    [SerializeField] float walkSpeed = 20f;
-    [SerializeField] float sprintSpeed = 40f;
+    [SerializeField] float walkSpeed = 14f;
+    [SerializeField] float sprintSpeed = 28f;
     [SerializeField] float turnSpeed = 720f;
     [SerializeField] float jumpHeight = 1.8f;
     [SerializeField] float gravity = -20f;
@@ -70,6 +72,9 @@ public class PlayerController : MonoBehaviour
         controller.enabled = true;
         yaw = rotation.eulerAngles.y;
         verticalVelocity = 0f;
+        planarVelocity = knockback = Vector3.zero;
+        iceZones = 0;
+        platform = null;
     }
 
     public void SetCheckpoint(Vector3 position, Quaternion rotation)
@@ -142,7 +147,7 @@ public class PlayerController : MonoBehaviour
             transform.rotation = Quaternion.RotateTowards(transform.rotation, target, turnSpeed * Time.deltaTime);
         }
 
-        if (controller.isGrounded)
+        if (controller.isGrounded && verticalVelocity <= 0f)
         {
             // Small downward push keeps isGrounded stable on slopes.
             verticalVelocity = -2f;
@@ -156,21 +161,86 @@ public class PlayerController : MonoBehaviour
 
         verticalVelocity += gravity * Time.deltaTime;
 
-        Vector3 velocity = moveDir * speed + Vector3.up * verticalVelocity;
+        // Horizontal velocity chases the input. Normally almost instantly; on ice (low traction)
+        // Henry keeps sliding and takes a while to turn or stop. Knockbacks add on top.
+        float t = InCutscene ? 30f : (iceZones > 0 ? IceTraction : traction);
+        planarVelocity = Vector3.Lerp(planarVelocity, moveDir * speed, 1f - Mathf.Exp(-t * Time.deltaTime));
+        knockback = Vector3.Lerp(knockback, Vector3.zero, 1f - Mathf.Exp(-4f * Time.deltaTime));
+
+        // Ride whatever moving thing he's standing on: carry him along by however far the spot under
+        // his feet moved (and turned) since last frame.
+        if (platform != null && platform.gameObject.activeInHierarchy)
+        {
+            var carried = platform.TransformPoint(platformLocal) - transform.position;
+            float turn = Mathf.DeltaAngle(platformYaw, platform.eulerAngles.y);
+            if (carried.sqrMagnitude < 4f) controller.Move(carried);
+            if (Mathf.Abs(turn) < 45f) { transform.Rotate(0f, turn, 0f); yaw += turn; }
+        }
+
+        Vector3 velocity = planarVelocity + knockback + Vector3.up * verticalVelocity;
+        standingOn = null;
         controller.Move(velocity * Time.deltaTime);
+
+        platform = controller.isGrounded ? standingOn : null;
+        if (platform != null)
+        {
+            platformLocal = platform.InverseTransformPoint(transform.position);
+            platformYaw = platform.eulerAngles.y;
+        }
     }
+
+    // Moving platforms are anything with a kinematic Rigidbody (bobbing ice cubes, moving plates,
+    // tipping planks, lifting ramps).
+    Transform platform, standingOn;
+    Vector3 platformLocal;
+    float platformYaw;
+
+    void OnControllerColliderHit(ControllerColliderHit hit)
+    {
+        if (hit.normal.y < 0.5f) return;
+        var body = hit.collider.attachedRigidbody;
+        standingOn = body != null && body.isKinematic ? hit.collider.transform : null;
+    }
+
+    [Header("Traction")]
+    [SerializeField] float traction = 22f;
+    const float IceTraction = 1.6f;
+    Vector3 planarVelocity, knockback;
+    int iceZones;
+
+    public bool OnIce => iceZones > 0;
+    public void EnterIce() => iceZones++;
+    public void ExitIce() => iceZones = Mathf.Max(0, iceZones - 1);
+
+    // Bounce pads and the like: throw Henry straight up at this speed.
+    public void Launch(float upSpeed)
+    {
+        verticalVelocity = upSpeed;
+        Jumped?.Invoke();
+    }
+
+    // Shoved by something (a falling item): a horizontal push plus a little hop.
+    public void Knock(Vector3 push)
+    {
+        knockback = new Vector3(push.x, 0, push.z);
+        verticalVelocity = Mathf.Max(verticalVelocity, push.y);
+    }
+
+    // Set by cutscenes that drive the camera themselves.
+    public bool CameraLocked { get; set; }
 
     void LateUpdate()
     {
-        if (cam == null) return;
+        if (cam == null || CameraLocked) return;
 
         Vector3 pivot = transform.position + Vector3.up * cameraHeight;
         Quaternion rot = Quaternion.Euler(pitch, yaw, 0f);
         float dist = cameraDistance;
 
-        // Pull the camera in when something (e.g. a shelf) is between it and the player.
+        // Pull the camera in when something (e.g. a shelf) is between it and the player. Invisible
+        // seals sit on the Ignore Raycast layer, which DefaultRaycastLayers leaves out.
         if (Physics.SphereCast(pivot, 0.2f, rot * Vector3.back, out RaycastHit hit, cameraDistance,
-                ~0, QueryTriggerInteraction.Ignore) && hit.transform != transform && !hit.transform.IsChildOf(transform))
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore) && hit.transform != transform && !hit.transform.IsChildOf(transform))
             dist = hit.distance;
 
         cam.SetPositionAndRotation(pivot - rot * Vector3.forward * dist, rot);

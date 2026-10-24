@@ -23,6 +23,28 @@ public class Carryable : MonoBehaviour
         }
     }
 
+    // Bounds center relative to the pivot, in local space (for holding it by its middle).
+    public Vector3 CenterOffsetLocal()
+    {
+        var rs = GetComponentsInChildren<Renderer>();
+        if (rs.Length == 0) return Vector3.zero;
+        var b = rs[0].bounds;
+        foreach (var r in rs) b.Encapsulate(r.bounds);
+        return transform.InverseTransformVector(b.center - transform.position);
+    }
+
+    // Size along its own axes (x across, y up, z forward), ignoring how it's currently rotated.
+    public Vector3 LocalSize()
+    {
+        var mf = GetComponentInChildren<MeshFilter>();
+        if (mf == null || mf.sharedMesh == null) return Vector3.one * Height;
+        var s = Vector3.Scale(mf.sharedMesh.bounds.size, mf.transform.lossyScale);
+        var inv = Quaternion.Inverse(transform.rotation) * mf.transform.rotation;
+        return Abs(inv * s);
+    }
+
+    static Vector3 Abs(Vector3 v) => new Vector3(Mathf.Abs(v.x), Mathf.Abs(v.y), Mathf.Abs(v.z));
+
     public void PickUp(Transform holder, Vector3 localOffset)
     {
         IsHeld = true;

@@ -22,6 +22,7 @@ public class PlayerInteractor : MonoBehaviour
     {
         player = GetComponent<PlayerController>();
         anim = GetComponent<PlayerAnimator>();
+        ik = GetComponentInChildren<CarryIK>();
         interact = InputSystem.actions.FindAction("Player/Interact", true);
     }
 
@@ -64,12 +65,44 @@ public class PlayerInteractor : MonoBehaviour
         if (anim != null) anim.PlayPickUp();
         yield return new WaitForSeconds(GrabAt);
         held = item;
-        float h = item.Height;
-        held.PickUp(transform, new Vector3(0, 0.15f + h * 0.5f, 0.7f + h * 0.35f));
+        var fromPos = item.transform.position;
+        var fromRot = item.transform.rotation;
+        held.PickUp(transform, Vector3.zero);
+        heldCenterOffset = held.CenterOffsetLocal();
+        heldSize = held.LocalSize();
+        grabFrom = fromPos;
+        grabFromRot = fromRot;
+        grabStart = Time.time;
         if (anim != null) anim.SetCarrying(true);
+        if (ik != null) ik.Hold(held.transform, heldSize, heldCenterOffset);
         yield return new WaitForSeconds(BendTime - GrabAt);
         busy = false;
     }
+
+    // The carried item rides out in front of Henry's chest, its back face just clear of his body
+    // and its bottom above his feet, so it never sinks into him; CarryIK puts his hands on its
+    // sides. Right after the grab it glides up from where it lay instead of popping into place.
+    void LateUpdate()
+    {
+        if (held == null) return;
+        float chestY = transform.position.y + 0.35f;
+        var chest = anim != null ? anim.Bone(HumanBodyBones.Chest) : null;
+        if (chest != null) chestY = chest.position.y;
+        float feet = transform.position.y - 1f;
+        var center = transform.position + transform.forward * (BodyRadius + heldSize.z * 0.5f);
+        center.y = Mathf.Max(chestY + 0.15f, feet + heldSize.y * 0.5f + 0.3f); // hugged at chest height
+
+        var rot = transform.rotation;
+        var pos = center - rot * heldCenterOffset;
+        float k = Mathf.SmoothStep(0f, 1f, (Time.time - grabStart) / GlideTime);
+        held.transform.SetPositionAndRotation(Vector3.Lerp(grabFrom, pos, k), Quaternion.Slerp(grabFromRot, rot, k));
+    }
+
+    const float BodyRadius = 0.42f, GlideTime = 0.3f;
+    Vector3 heldCenterOffset, heldSize, grabFrom;
+    Quaternion grabFromRot;
+    float grabStart;
+    CarryIK ik;
 
     IEnumerator PutDown()
     {
@@ -80,6 +113,7 @@ public class PlayerInteractor : MonoBehaviour
             anim.PlayPickUp();
             anim.SetCarrying(false);
         }
+        if (ik != null) ik.Release();
         yield return new WaitForSeconds(GrabAt);
         var forward = transform.forward;
         held.PutDown(transform.position + forward * dropDistance, Quaternion.LookRotation(forward));

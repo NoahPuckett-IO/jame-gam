@@ -1,21 +1,24 @@
 using UnityEngine;
 
-// Drives Henry's Animator from the PlayerController: walk/sprint blend from ground speed, jump and
-// fall, the pick-up motion, and the arms layer while carrying something.
+// Drives Henry's Animator from the PlayerController: idle/walk/jog/sprint blend from ground speed,
+// jump start/loop/land, the pick-up motion, getting hit, and the arms layer while carrying.
+// Cutscenes can also play named states directly (Crawl, WakeUp, Flail, ...).
 public class PlayerAnimator : MonoBehaviour
 {
     [SerializeField] Animator animator;
-    [SerializeField] float walkSpeed = 20f, sprintSpeed = 40f;
 
     PlayerController player;
     Vector3 lastPos;
     float speedParam, carryWeight, carryTarget;
+    bool scripted;
 
     static readonly int SpeedId = Animator.StringToHash("Speed");
     static readonly int GroundedId = Animator.StringToHash("Grounded");
-    static readonly int VertId = Animator.StringToHash("VerticalSpeed");
     static readonly int JumpId = Animator.StringToHash("Jump");
     static readonly int PickId = Animator.StringToHash("PickUp");
+    static readonly int HitId = Animator.StringToHash("Hit");
+
+    public Animator Animator => animator;
 
     void Awake()
     {
@@ -30,30 +33,37 @@ public class PlayerAnimator : MonoBehaviour
         var delta = transform.position - lastPos;
         lastPos = transform.position;
         float dt = Mathf.Max(Time.deltaTime, 1e-4f);
-        var v = delta / dt;
-        float ground = new Vector2(v.x, v.z).magnitude;
+        float ground = new Vector2(delta.x, delta.z).magnitude / dt;
+        if (ground > 200f) ground = 0f; // teleports
 
-        // 0 = idle, 1 = walking pace, 2 = sprinting pace.
-        float target = ground < 0.5f ? 0f : ground <= walkSpeed ? ground / walkSpeed : 1f + (ground - walkSpeed) / (sprintSpeed - walkSpeed);
-        speedParam = Mathf.MoveTowards(speedParam, Mathf.Clamp(target, 0f, 2f), dt * 6f);
+        speedParam = Mathf.Lerp(speedParam, ground, 1f - Mathf.Exp(-12f * dt));
         animator.SetFloat(SpeedId, speedParam);
-        animator.SetBool(GroundedId, player == null || player.IsGrounded || Mathf.Abs(v.y) < 0.5f);
-        animator.SetFloat(VertId, v.y);
-        // Walk/run cycles play faster than real time when Henry hurries.
-        animator.speed = speedParam > 1.2f ? 1.25f : 1f;
+        animator.SetBool(GroundedId, player == null || player.IsGrounded);
+        // Henry covers a lot of ground for his size; speed the sprint cycle up to keep his feet planted.
+        animator.speed = scripted ? 1f : Mathf.Clamp(speedParam / 22f, 1f, 1.6f);
 
         carryWeight = Mathf.MoveTowards(carryWeight, carryTarget, dt * 5f);
         if (animator.layerCount > 1) animator.SetLayerWeight(1, carryWeight);
     }
 
     public void PlayPickUp() => animator.SetTrigger(PickId);
-
+    public void PlayHit() => animator.SetTrigger(HitId);
     public void SetCarrying(bool carrying) => carryTarget = carrying ? 1f : 0f;
 
-    public void Setup(Animator anim, float walk, float sprint)
+    // For cutscenes: cross-fade to a named state; Resume() hands control back to the normal graph.
+    public void Play(string state, float fade = 0.2f)
     {
-        animator = anim;
-        walkSpeed = walk;
-        sprintSpeed = sprint;
+        scripted = true;
+        animator.CrossFadeInFixedTime(state, fade);
     }
+
+    public void Resume()
+    {
+        scripted = false;
+        animator.CrossFadeInFixedTime("Locomotion", 0.3f);
+    }
+
+    public Transform Bone(HumanBodyBones bone) => animator != null ? animator.GetBoneTransform(bone) : null;
+
+    public void Setup(Animator anim) => animator = anim;
 }

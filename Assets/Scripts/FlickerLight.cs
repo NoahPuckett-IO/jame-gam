@@ -41,6 +41,7 @@ public class FlickerLight : MonoBehaviour
         lamp.intensity = baseIntensity * level;
         if (fixture != null)
         {
+            if (block == null) block = new MaterialPropertyBlock(); // survives a script reload mid-play
             block.SetColor(EmissionId, emission * level);
             fixture.SetPropertyBlock(block);
         }

@@ -19,6 +19,14 @@ public class MainMenu : MonoBehaviour
     public void Play()
     {
         gameObject.SetActive(false);
+        // The intro cutscene (woods → UFO → shrunk → waking up in a cereal box) hands control over
+        // when it's done; without one, start right away at the spawn.
+        var intro = FindAnyObjectByType<IntroCutscene>();
+        if (intro != null)
+        {
+            intro.Play();
+            return;
+        }
         player.Teleport(spawnPoint.position, spawnPoint.rotation);
         player.SetCheckpoint(spawnPoint.position, spawnPoint.rotation);
         player.enabled = true;

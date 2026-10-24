@@ -63,7 +63,7 @@ static partial class GroceryStoreBuilder
                 ("k:candy-bar", 0.15f), ("k:chocolate", 0.15f), ("k:cake", 0.25f), ("k:pie", 0.25f), ("Soap", 0.2f), ("toaster", 0.3f) },
     };
 
-    [MenuItem("JameGam/Build Grocery Store")]
+    [MenuItem("JameGam/Build Grocery Store %#&b")] // Ctrl+Shift+Alt+B
     static void Build()
     {
         MakeModelsReadable(); // the builder reads meshes to find shelf boards and true bounds
@@ -107,6 +107,8 @@ static partial class GroceryStoreBuilder
         Box("Wall E", store.transform, new Vector3(right + wallT / 2, WallHeight / 2, 0), new Vector3(wallT, WallHeight, depth), wallMat);
         BuildWestWallAndDoor(store.transform, left - wallT / 2, wallT, depth, wallMat);
 
+        devWarps.Clear();
+        settleQueue.Clear();
         var aisles = new List<Transform>();
         for (int i = 0; i < AisleCount; i++)
         {
@@ -116,15 +118,23 @@ static partial class GroceryStoreBuilder
         var wallShelf = BuildAisle(0, store.transform, shelf.doubleSided ? right : right - shelf.depth / 2, units, aisleLength, shelfPrefab, shelf);
         wallShelf.name = "Wall Shelf";
 
+        // Walkway centers, east to west: 0 is the first hallway (Level One), 1 the shelf climb,
+        // 2 the freezer aisle, 3 the falling aisle.
+        var walkways = new List<float>();
+        for (int w = 0; w <= AisleCount; w++)
+            walkways.Add(aislesRight - WalkwayWidth / 2 - w * (shelf.gondolaDepth + WalkwayWidth));
+        PlanLevelTwo(aisles, walkways, shelf); // reserves the shelf boards Level Two walks on
+
         TalkerColors = new[]
         {
             GetMaterial("Talker Red", new Color(0.9f, 0.12f, 0.1f)), GetMaterial("Talker Yellow", new Color(1f, 0.8f, 0.1f)),
             GetMaterial("Talker Green", new Color(0.15f, 0.7f, 0.3f)), GetMaterial("Talker Orange", new Color(1f, 0.45f, 0.05f)),
         };
-        PlaceBoxes(store.transform, aisles, shelf, aisleLength);
+        // Aisles 2 and 3 have freezers along their freezer-aisle halves, so no boxes on top.
+        PlaceBoxes(store.transform, aisles.Where((a, i) => i != 1 && i != 2).ToList(), shelf, aisleLength);
         BuildBlockades(store.transform, aisles, shelf, aisleLength, depth);
         for (int i = 0; i < aisles.Count && i < Stock.Length; i++)
-            StockAisle(aisles[i], shelf, aisleLength, Stock[i]);
+            StockAisle(aisles[i], shelf, aisleLength, Stock[i], sides: i == 1 ? new[] { 1 } : i == 2 ? new[] { -1 } : null);
         StockAisle(wallShelf, shelf, aisleLength, Stock[1], sides: new[] { -1 }); // only the side facing the hallway
 
         BuildEndcaps(store.transform, aisles, shelf, aisleLength);
@@ -167,15 +177,34 @@ static partial class GroceryStoreBuilder
         Object.DestroyImmediate(player.GetComponent<CapsuleCollider>());
         player.GetComponent<Renderer>().sharedMaterial = playerMat;
         var controller = player.AddComponent<PlayerController>();
-        AddHenry(player, controller);
+        var henryModel = AddHenry(player, controller);
+        if (henryModel != null) henryModel.AddComponent<HeadLook>();
         player.AddComponent<PlayerInteractor>();
+        player.AddComponent<FallingHitResponder>();
         Undo.RegisterCreatedObjectUndo(player, "Build Grocery Store");
 
-        // Walkway centers, east to west: 0 is the first hallway.
-        var walkways = new List<float>();
-        for (int w = 0; w <= AisleCount; w++)
-            walkways.Add(aislesRight - WalkwayWidth / 2 - w * (shelf.gondolaDepth + WalkwayWidth));
-        BuildLevelOne(store.transform, walkways, aisleLength, depth, spawn.position);
+        BuildLevelOne(store.transform, walkways, aisleLength, depth, spawn, out var wakeInside, out var wakeOutside);
+        BuildLevelTwo(store.transform, aisleLength);
+        BuildLevelThree(store.transform, aisles, walkways, shelf, aisleLength);
+        BuildLevelFour(store.transform, walkways, aisleLength);
+        BuildIntro(store.transform, controller, wakeInside, wakeOutside);
+        spawn.SetPositionAndRotation(wakeOutside.position, wakeOutside.rotation);
+
+        // Number keys 1–4: developer warps to the start of each level; 5 and up: to spots partway
+        // through, which the level builders register in devWarps.
+        var warps = new GameObject("Level Warps").transform;
+        warps.SetParent(store.transform);
+        var warpList = new List<Transform>
+        {
+            Waypoint(warps, "Level 1", wakeOutside.position, 0),
+            Waypoint(warps, "Level 2", new Vector3(walkways[1], 1, aisleLength / 2 + 2f), 180),
+            Waypoint(warps, "Level 3", new Vector3(walkways[2], 1, -aisleLength / 2 - 2f), 0),
+            Waypoint(warps, "Level 4", new Vector3(walkways[3], 1, aisleLength / 2 + 2f), 180),
+        };
+        foreach (var (name, pos, yaw) in devWarps) warpList.Add(Waypoint(warps, name, pos, yaw));
+        devWarps.Clear();
+        warps.gameObject.AddComponent<LevelWarp>().Setup(warpList.ToArray());
+        player.transform.position = wakeInside.position;
 
         // Menu backdrop: the camera starts low behind the spawn, looking up the first towering hall.
         if (Camera.main != null)
@@ -184,10 +213,12 @@ static partial class GroceryStoreBuilder
             Camera.main.transform.SetPositionAndRotation(spawn.position + new Vector3(-4f, 2.5f, -10f), Quaternion.Euler(-8f, 8f, 0f));
         }
 
+        SettleProps();
         AddGrime(store.transform, left, right, depth);
         MakeProductsMatte(store.transform);
 
         MenuBuilder.Build(controller, spawn);
+        BuildMusic();
 
         // The store is a few hundred units across; make sure the far end is not clipped.
         if (Camera.main != null)
@@ -200,13 +231,60 @@ static partial class GroceryStoreBuilder
         Selection.activeGameObject = player;
     }
 
-    // Swaps the placeholder capsule's looks for Henry (Kenney Mini Characters, CC0), sized to the
-    // 2-unit CharacterController with his feet on its bottom, and wires up his animations.
-    static void AddHenry(GameObject player, PlayerController controller)
+    // The soundtrack: one looping track (Assets/Audio/Ezrasong4game.wav), streamed and compressed
+    // so the 50 MB WAV doesn't sit in memory. GameMusic pauses it for menus and cutscenes.
+    static void BuildMusic()
+    {
+        const string path = "Assets/Audio/Ezrasong4game.wav";
+        var old = GameObject.Find("Game Music");
+        if (old != null) Object.DestroyImmediate(old);
+        if (AssetImporter.GetAtPath(path) is AudioImporter importer)
+        {
+            var s = importer.defaultSampleSettings;
+            if (s.loadType != AudioClipLoadType.Streaming || s.compressionFormat != AudioCompressionFormat.Vorbis)
+            {
+                s.loadType = AudioClipLoadType.Streaming;
+                s.compressionFormat = AudioCompressionFormat.Vorbis;
+                s.quality = 0.6f;
+                importer.defaultSampleSettings = s;
+                importer.SaveAndReimport();
+            }
+        }
+        var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(path);
+        if (clip == null) return;
+        var go = new GameObject("Game Music", typeof(AudioSource));
+        var src = go.GetComponent<AudioSource>();
+        src.clip = clip;
+        src.loop = true;
+        src.playOnAwake = false;
+        src.spatialBlend = 0f;
+        go.AddComponent<GameMusic>();
+        Undo.RegisterCreatedObjectUndo(go, "Build Grocery Store");
+    }
+
+    // Extra developer warp spots (keys 5 and up), added by the level builders.
+    static readonly List<(string, Vector3, float)> devWarps = new List<(string, Vector3, float)>();
+
+    // Footsteps and jump grunts (both from the Freesound community, Pixabay licence), cut into
+    // single sounds so each step or jump plays a random one.
+    public static void AddSounds(GameObject body, Animator animator)
+    {
+        var stepClips = SoundSlicer.Slice("Assets/Audio/Footsteps.mp3", "Assets/Audio/Steps", "Step", 0.15f, 0.05f, 0.03f, 6);
+        var gruntClips = SoundSlicer.Slice("Assets/Audio/Grunts.mp3", "Assets/Audio/Grunts", "Grunt", 0.12f, 0.12f, 0.08f, 10);
+        var src = body.AddComponent<AudioSource>();
+        src.playOnAwake = false;
+        body.AddComponent<PlayerSounds>().Setup(animator, stepClips, gruntClips);
+    }
+
+    // Swaps the placeholder capsule's looks for Henry (Kenney Animated Characters + Quaternius'
+    // Universal Animation Library, both CC0), sized to the 2-unit CharacterController with his
+    // feet on its bottom, and wires up his animations. A soft fill light rides along so he stays
+    // readable in the dark aisles.
+    static GameObject AddHenry(GameObject player, PlayerController controller)
     {
         CharacterSetup.EnsureImport();
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(CharacterSetup.ModelPath);
-        if (prefab == null) return;
+        if (prefab == null) return null;
 
         Object.DestroyImmediate(player.GetComponent<MeshRenderer>());
         Object.DestroyImmediate(player.GetComponent<MeshFilter>());
@@ -214,6 +292,14 @@ static partial class GroceryStoreBuilder
         var model = (GameObject)PrefabUtility.InstantiatePrefab(prefab, player.transform);
         model.name = "Henry";
         model.transform.localPosition = Vector3.zero;
+        model.transform.localRotation = Quaternion.identity;
+        var mat = CharacterSetup.HenryMaterial();
+        foreach (var r in model.GetComponentsInChildren<Renderer>())
+        {
+            r.sharedMaterials = Enumerable.Repeat(mat, r.sharedMaterials.Length).ToArray();
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+            if (r is SkinnedMeshRenderer smr) smr.updateWhenOffscreen = true;
+        }
         var b = GetBounds(model);
         model.transform.localScale *= 2f / b.size.y;
         b = GetBounds(model);
@@ -221,13 +307,32 @@ static partial class GroceryStoreBuilder
 
         var animator = model.GetComponent<Animator>();
         if (animator == null) animator = model.AddComponent<Animator>();
-        animator.runtimeAnimatorController = CharacterSetup.BuildController(prefab);
+        animator.runtimeAnimatorController = CharacterSetup.BuildController();
         animator.applyRootMotion = false;
         animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
-        foreach (var r in model.GetComponentsInChildren<Renderer>())
-            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
 
-        player.AddComponent<PlayerAnimator>().Setup(animator, controller.WalkSpeed, controller.SprintSpeed);
+        var fill = new GameObject("Henry Fill Light").AddComponent<Light>();
+        fill.transform.SetParent(player.transform, false);
+        fill.transform.localPosition = new Vector3(0.8f, 3f, -2.5f);
+        fill.type = LightType.Point;
+        fill.color = new Color(1f, 0.95f, 0.88f);
+        fill.range = 9f;
+        fill.intensity = 9f;
+        fill.shadows = LightShadows.None;
+        // A softer key from in front and above so his face and clothes read in the shadows.
+        var key = new GameObject("Henry Key Light").AddComponent<Light>();
+        key.transform.SetParent(player.transform, false);
+        key.transform.localPosition = new Vector3(-0.6f, 2.6f, 2.4f);
+        key.type = LightType.Point;
+        key.color = new Color(0.85f, 0.9f, 1f);
+        key.range = 6f;
+        key.intensity = 5f;
+        key.shadows = LightShadows.None;
+
+        player.AddComponent<PlayerAnimator>().Setup(animator);
+        model.AddComponent<CarryIK>();
+        AddSounds(player, animator);
+        return model;
     }
 
     // West wall with a big doorway in the middle, sliding glass doors, and bright daylight outside.
@@ -809,6 +914,7 @@ static partial class GroceryStoreBuilder
                     if (r == 0 && rng.NextDouble() < 0.02) continue;
 
                     float px = front - side * (d / 2 + r * (d + gap) + rand(0f, gap));
+                    if (InNoStockZone(new Vector3(px, y + 1f, zc))) continue; // a board the level route walks on
                     if (!HasSurface(upTris, px, zc - w * 0.4f, y) || !HasSurface(upTris, px, zc + w * 0.4f, y)) continue;
 
                     var p = Spawn(type.prefab, parent, type.yaw + (side > 0 ? 0 : 180), s * rand(0.93f, 1f));
@@ -915,6 +1021,7 @@ static partial class GroceryStoreBuilder
                     fallen.transform.Rotate(Rand(60f, 90f), 0, 0, Space.World);
                     PlaceOnFloor(fallen, new Vector3(x + Rand(-1f, 1f) * box, 0, z + Rand(-0.5f, 0.5f) * box));
                     AddBoxColliders(fallen);
+                    SettleLater(fallen);
                 }
             }
 
@@ -932,6 +1039,7 @@ static partial class GroceryStoreBuilder
                 if (tumble) p.transform.rotation = Quaternion.Euler(Rand(0f, 360f), Rand(0f, 360f), Rand(0f, 360f)) * p.transform.rotation;
                 PlaceOnFloor(p, at);
                 AddBoxColliders(p);
+                if (at.y <= 0.01f) SettleLater(p); // spilled on the floor: let it tumble to rest
                 return p;
             }
 

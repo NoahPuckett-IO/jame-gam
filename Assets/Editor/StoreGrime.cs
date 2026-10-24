@@ -45,6 +45,10 @@ static partial class GroceryStoreBuilder
                     matte.SetFloat("_Smoothness", 0.12f);
                     matte.SetFloat("_Metallic", 0f);
                     matte.SetFloat("_EnvironmentReflections", 0.3f);
+                    // Draw both faces: some models (open boxes, wrappers, cups) are single-sided shells
+                    // you could otherwise see straight through from behind.
+                    matte.SetFloat("_Cull", 0f);
+                    matte.doubleSidedGI = true;
                     copies[m] = matte;
                 }
                 mats[i] = matte;

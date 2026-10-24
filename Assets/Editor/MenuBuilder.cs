@@ -5,9 +5,8 @@ using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 
-// Builds the title screen. The live store shows through on the right (the camera starts low in the
-// first hall); a dark teal gradient on the left carries the title, a tagline and the buttons, and a
-// framed card on the right holds the character drawing. Called from GroceryStoreBuilder.
+// Builds the title screen on a solid deep-teal background: title, tagline and buttons on the left,
+// a framed card on the right for the character drawing. Called from GroceryStoreBuilder.
 static class MenuBuilder
 {
     public const string GameTitle = "Tiny Henry";
@@ -39,10 +38,10 @@ static class MenuBuilder
         scaler.matchWidthOrHeight = 0.5f;
         var root = canvasGo.transform;
 
-        // Backdrop: the 3D store shows through; darken the left for legibility and the bottom edge.
-        var shade = Rect("Shade", root, Vector2.zero, Vector2.one);
-        var shadeImg = shade.gameObject.AddComponent<RawImage>();
-        shadeImg.texture = Gradient();
+        // Backdrop: one solid deep-teal color.
+        var shade = Rect("Background", root, Vector2.zero, Vector2.one);
+        var shadeImg = shade.gameObject.AddComponent<Image>();
+        shadeImg.color = new Color(0.035f, 0.075f, 0.085f, 1f);
         shadeImg.raycastTarget = false;
 
         // Title block.
@@ -128,34 +127,6 @@ static class MenuBuilder
 
     static string GroceryStoreBuilderGlyph(string name) => GroceryStoreBuilder.Glyph(name);
 
-    // Horizontal fade: dark teal-black on the left to clear by ~60% across, plus a darker bottom edge.
-    static Texture2D Gradient()
-    {
-        const string path = "Assets/Materials/MenuGradient.png";
-        var existing = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
-        if (existing != null) return existing;
-        const int w = 256, h = 64;
-        var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
-        for (int y = 0; y < h; y++)
-        for (int x = 0; x < w; x++)
-        {
-            float u = x / (w - 1f), v = y / (h - 1f);
-            float a = Mathf.Clamp01(1f - Mathf.SmoothStep(0.25f, 0.68f, u)) * 0.93f;
-            a = Mathf.Max(a, Mathf.Clamp01(1f - v * 4f) * 0.6f); // bottom edge
-            tex.SetPixel(x, y, new Color(0.02f, 0.05f, 0.06f, a));
-        }
-        System.IO.File.WriteAllBytes(path, tex.EncodeToPNG());
-        Object.DestroyImmediate(tex);
-        AssetDatabase.ImportAsset(path);
-        if (AssetImporter.GetAtPath(path) is TextureImporter ti)
-        {
-            ti.alphaIsTransparency = true;
-            ti.wrapMode = TextureWrapMode.Clamp;
-            ti.mipmapEnabled = false;
-            ti.SaveAndReimport();
-        }
-        return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
-    }
 
     static RectTransform Rect(string name, Transform parent, Vector2 min, Vector2 max)
     {
