@@ -37,9 +37,10 @@ public class CarryIK : MonoBehaviour
         if (item == null || weight <= 0.001f) return;
         var center = item.position + item.TransformVector(centerOffset);
         float lift = grounder != null ? grounder.Offset : 0f;
-        var low = center - item.up * (size.y * 0.3f) - Vector3.up * lift;
-        Place(AvatarIKGoal.LeftHand, AvatarIKHint.LeftElbow, low - item.right * (size.x / 2 + 0.03f), -item.right);
-        Place(AvatarIKGoal.RightHand, AvatarIKHint.RightElbow, low + item.right * (size.x / 2 + 0.03f), item.right);
+        var low = center - Vector3.up * (size.y * 0.5f + 0.05f + lift);
+        float grip = Mathf.Min(size.x * 0.5f - 0.05f, 0.45f);
+        Place(AvatarIKGoal.LeftHand, AvatarIKHint.LeftElbow, low - item.right * grip, -item.right);
+        Place(AvatarIKGoal.RightHand, AvatarIKHint.RightElbow, low + item.right * grip, item.right);
     }
 
     void Place(AvatarIKGoal goal, AvatarIKHint elbow, Vector3 position, Vector3 outward)

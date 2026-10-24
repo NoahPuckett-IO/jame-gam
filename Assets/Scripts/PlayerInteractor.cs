@@ -80,7 +80,9 @@ public class PlayerInteractor : MonoBehaviour
     {
         if (held == null) return;
         float headTop = transform.position.y + 1.08f + (grounder != null ? grounder.Offset : 0f);
-        var center = transform.position + transform.forward * 0.05f;
+        var center = transform.position;
+        var head = anim != null ? anim.Bone(HumanBodyBones.Head) : null;
+        if (head != null) { center.x = head.position.x; center.z = head.position.z; }
         center.y = headTop + heldSize.y * 0.5f;
 
         var rot = transform.rotation;
