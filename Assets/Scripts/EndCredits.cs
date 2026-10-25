@@ -14,6 +14,8 @@ public class EndCredits : MonoBehaviour
         ("DEVELOPMENT & DESIGN", "Ezra Kerney"),
         ("LEVEL DESIGN & STORYBOARDING", "Noah Puckett"),
         ("MUSIC", "Leif Andresen"),
+        ("PLAYTESTING", "Ryan Rudisill"),
+        ("NAMESAKE", "Henry Russel"),
     };
 
     bool done;

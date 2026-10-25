@@ -13,6 +13,8 @@ public class FootGrounder : MonoBehaviour
 
     public float Offset => applied;
 
+    void OnDisable() => applied = 0f;
+
     void Awake()
     {
         animator = GetComponent<Animator>();

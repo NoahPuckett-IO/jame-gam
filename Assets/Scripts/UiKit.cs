@@ -102,9 +102,12 @@ public static class UiKit
         var handleArea = Fill(rt, "Handle Area");
         handleArea.offsetMin = new Vector2(14, 0);
         handleArea.offsetMax = new Vector2(-14, 0);
-        var handle = Rect(handleArea, "Handle", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(34, 34));
+        // the slider stretches the handle to the full track height, so only add what's left to make it 34 tall
+        var handle = Rect(handleArea, "Handle", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(34, 34 - 28));
         var knob = handle.gameObject.AddComponent<Image>();
         knob.sprite = Knob;
+        knob.type = UnityEngine.UI.Image.Type.Simple;
+        knob.preserveAspect = true;
         knob.color = Color.white;
         var s = rt.gameObject.AddComponent<Slider>();
         s.fillRect = fill;

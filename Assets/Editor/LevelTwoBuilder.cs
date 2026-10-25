@@ -43,7 +43,7 @@ static partial class GroceryStoreBuilder
             b.SetMinMax(new Vector3(x0, h - 0.5f, Mathf.Min(zA, zB)), new Vector3(x1, h + 7f, Mathf.Max(zA, zB)));
             NoStockZones.Add(b);
         }
-        Zone(true, hall.h1, 66f, 100f);
+        Zone(true, hall.h1, 66f, 112f);
         Zone(true, hall.h2, 22f, 56f);
         Zone(false, hall.h2, -16f, 30f);
         Zone(false, hall.h3, -46f, -20f);
@@ -69,7 +69,10 @@ static partial class GroceryStoreBuilder
         spill.gameObject.AddComponent<Hazard>();
         SodaSpill(root, hall.x, WalkwayWidth, zN - 17f, -zN + 6f, rng);
 
-        CanStairs(root, new Vector3(hall.xW + 1.4f, 0, zN - 0.5f), Vector3.back, 5, hall.h1);
+        float ladderZ = Mathf.Min(zN - 9f, 100f);
+        ToothpickLadder(root, new Vector3(hall.xW, 0, ladderZ), Vector3.right, hall.h1, new Vector3(hall.xW - 2.2f, hall.h1, ladderZ));
+        TutorialZoneAt(root, new Vector3(hall.xW + 3f, 4f, ladderZ), new Vector3(6f, 8f, 8f), "stairs", "CLIMB",
+            "Walk into the toothpick ladder (or press E) to grab it. W climbs, S goes down, Space lets go.", "W", "S", "E");
         CheckpointAt(root, "Checkpoint L2-A", new Vector3(hall.xW - 3.5f, hall.h1, 95f), new Vector3(6, 4, 4), 180);
         RollingCan(root, new Vector3(hall.xW - 5.6f, hall.h1, 86f), new Vector3(4.4f, 0, 0), 1.3f, 0f);
         RollingCan(root, new Vector3(hall.xW - 5.6f, hall.h1, 77f), new Vector3(4.4f, 0, 0), 1.1f, 0.45f);
@@ -159,6 +162,60 @@ static partial class GroceryStoreBuilder
             PlaceOnFloor(b, new Vector3(xc - width / 2 + (c + 0.5f) * width / cols, r * CerealH, z));
         }
         Solid(root, "Wall Collider", new Vector3(xc, rows * CerealH / 2, z), new Vector3(width + 2f, rows * CerealH, CerealD + 0.5f));
+    }
+
+    // toothpicks lashed end to end for the rails, single toothpicks for the rungs
+    static void ToothpickLadder(Transform parent, Vector3 faceAt, Vector3 outward, float topY, Vector3 landing)
+    {
+        var root = new GameObject("Toothpick Ladder").transform;
+        root.SetParent(parent);
+        const float spacing = 0.42f, first = 0.42f, half = 0.55f, pick = 1.17f, thick = 0.09f;
+        var wood = GetMaterial("Toothpick Wood", new Color(0.93f, 0.82f, 0.6f));
+        var tip = ConeMesh();
+        var across = Vector3.Cross(Vector3.up, outward).normalized;
+        var plane = faceAt + outward * 0.18f;
+        void Stick(Vector3 a, Vector3 b, float r)
+        {
+            var c = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            c.name = "Toothpick";
+            c.transform.SetParent(root);
+            var d = b - a;
+            float body = d.magnitude - r * 4f;
+            c.transform.SetPositionAndRotation((a + b) / 2, Quaternion.FromToRotation(Vector3.up, d));
+            c.transform.localScale = new Vector3(r, body / 2, r);
+            c.GetComponent<Renderer>().sharedMaterial = wood;
+            Object.DestroyImmediate(c.GetComponent<Collider>());
+            foreach (int end in new[] { -1, 1 })
+            {
+                var cone = new GameObject("Point", typeof(MeshFilter), typeof(MeshRenderer));
+                cone.transform.SetParent(c.transform.parent);
+                cone.transform.position = (a + b) / 2 + d.normalized * end * body / 2;
+                cone.transform.rotation = Quaternion.FromToRotation(Vector3.up, d.normalized * end);
+                cone.transform.localScale = new Vector3(r, r * 2f, r);
+                cone.GetComponent<MeshFilter>().sharedMesh = tip;
+                cone.GetComponent<MeshRenderer>().sharedMaterial = wood;
+            }
+        }
+
+        float railTop = topY + 1.3f;
+        foreach (int side in new[] { -1, 1 })
+        {
+            var x = plane + across * side * half;
+            int n = Mathf.CeilToInt(railTop / (pick * 0.85f));
+            for (int i = 0; i < n; i++)
+            {
+                float y0 = i * pick * 0.85f, y1 = Mathf.Min(y0 + pick, railTop + 0.1f);
+                var wobble = outward * ((i % 2) * 2 - 1) * thick * 0.6f;
+                Stick(x + Vector3.up * y0 + wobble, x + Vector3.up * y1 + wobble, thick * 1.15f);
+            }
+        }
+        for (float y = first; y < topY + 0.01f; y += spacing)
+        {
+            var c = plane + Vector3.up * y;
+            Stick(c - across * pick / 2, c + across * pick / 2, thick);
+        }
+
+        root.gameObject.AddComponent<Ladder>().Setup(plane, outward, topY, spacing, first, half, landing);
     }
 
     static void CanStairs(Transform parent, Vector3 start, Vector3 dir, int steps, float topY, bool descendingFromBoard = false)
@@ -285,7 +342,7 @@ static partial class GroceryStoreBuilder
         root.gameObject.AddComponent<BouncePad>().Setup(launch, visual);
     }
 
-    static void Slide(Transform parent, Vector3 top, Vector3 bottom, float width)
+    static void Slide(Transform parent, Vector3 top, Vector3 bottom, float width, float exitSpeed = 10f)
     {
         var root = new GameObject("Baking Tray Slide").transform;
         root.SetParent(parent);
@@ -307,13 +364,22 @@ static partial class GroceryStoreBuilder
         Part("Tray", new Vector3(0, -0.2f, 0), new Vector3(width, 0.25f, len));
         Part("Rim Left", new Vector3(-width / 2, 0.4f, 0), new Vector3(0.25f, 1.2f, len));
         Part("Rim Right", new Vector3(width / 2, 0.4f, 0), new Vector3(0.25f, 1.2f, len));
+        // the hanging wires come down to the rims so Henry rides between them
         var wire = GetMaterial("Wire", new Color(0.2f, 0.2f, 0.2f));
         foreach (float f in new[] { -0.35f, 0.35f })
+        foreach (float rim in new[] { -1f, 1f })
         {
-            var at = root.TransformPoint(new Vector3(0, 0, f * len));
+            var at = root.TransformPoint(new Vector3(rim * width / 2, 1f, f * len));
             float h = WallHeight - at.y;
             Box("Wire", parent, at + Vector3.up * h / 2, new Vector3(0.12f, h, 0.12f), wire);
         }
+
+        var ride = root.gameObject.AddComponent<BoxCollider>();
+        ride.isTrigger = true;
+        ride.center = new Vector3(0, 1.2f, 0);
+        ride.size = new Vector3(width, 2.4f, len);
+        float surface = -0.2f + 0.125f;
+        root.gameObject.AddComponent<LieSlide>().Setup(top + root.up * surface, bottom + root.up * surface, exitSpeed);
     }
 
     static void SodaSpill(Transform parent, float xc, float width, float z0, float z1, System.Random rng)

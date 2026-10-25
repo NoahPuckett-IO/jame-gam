@@ -309,20 +309,7 @@ static partial class GroceryStoreBuilder
             y = bb.max.y;
             if (h < stackHeight - 1) continue;
 
-            var t = types[rng.Next(types.Count)];
-            float inner = bb.size.x * 0.8f;
-            float s = Mathf.Min(t.size / Mathf.Max(t.bounds.x, t.bounds.y, t.bounds.z), inner / 2.2f / Mathf.Max(t.bounds.x, t.bounds.z));
-            float step = Mathf.Max(t.bounds.x, t.bounds.z) * s * 1.05f;
-            int n = Mathf.Max(1, Mathf.FloorToInt(inner / step));
-            float baseY = bb.max.y - bb.size.y * 0.35f;
-            for (int layer = 0; layer < 2; layer++)
-            for (int i = 0; i < n - layer; i++)
-            for (int j = 0; j < n - layer; j++)
-            {
-                float ox = (i - (n - layer - 1) / 2f) * step, oz = (j - (n - layer - 1) / 2f) * step;
-                var p = Spawn(t.prefab, parent, t.yaw + (float)rng.NextDouble() * 360f, s);
-                PlaceOnFloor(p, new Vector3(bb.center.x + ox, baseY + layer * t.bounds.y * s * 0.8f, bb.center.z + oz));
-            }
+            FillOpenBox(parent, b, open, types, rng, 9, raiseToRim: true);
         }
     }
 

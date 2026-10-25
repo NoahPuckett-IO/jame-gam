@@ -145,7 +145,7 @@ static class MenuBuilder
             var anim = henry.GetComponent<Animator>();
             if (anim != null && anim.avatar != null && anim.avatar.isHuman)
             {
-                CrossArms(anim);
+                HandsOnHips(anim);
                 Object.DestroyImmediate(anim);
             }
             b = renderers[0].bounds;
@@ -183,8 +183,24 @@ static class MenuBuilder
         return stage;
     }
 
-    static void CrossArms(Animator anim)
+    // a relaxed idle frame with the hands set on the hips, elbows out, so the arms clear the body
+    static void HandsOnHips(Animator anim)
     {
+        var body = anim.transform;
+        var hips = anim.GetBoneTransform(HumanBodyBones.Hips);
+        var lUpper = anim.GetBoneTransform(HumanBodyBones.LeftUpperArm);
+        var rUpper = anim.GetBoneTransform(HumanBodyBones.RightUpperArm);
+        if (hips == null || lUpper == null || rUpper == null) return;
+        float feetY = body.position.y;
+        float hipsY = hips.position.y - feetY;
+
+        // the hands sit on the narrow of the waist, a little above the hip joint
+        float handY = hipsY + 0.16f;
+        const float waist = 0.2f;
+
+        var idle = CharacterSetup.Clip("Idle_Loop");
+        if (idle != null) idle.SampleAnimation(anim.gameObject, 0.4f);
+
         var handler = new HumanPoseHandler(anim.avatar, anim.transform);
         var pose = new HumanPose();
         handler.GetHumanPose(ref pose);
@@ -194,12 +210,67 @@ static class MenuBuilder
             if (i >= 0) pose.muscles[i] = v;
         }
         Set("Head Nod Down-Up", 0.05f);
+        Set("Head Tilt Left-Right", 0.04f);
         handler.SetHumanPose(ref pose);
         handler.Dispose();
 
-        var body = anim.transform;
-        Aim(anim, HumanBodyBones.LeftUpperArm, HumanBodyBones.LeftLowerArm, HumanBodyBones.LeftHand, -body.right, body, 0.08f);
-        Aim(anim, HumanBodyBones.RightUpperArm, HumanBodyBones.RightLowerArm, HumanBodyBones.RightHand, body.right, body, -0.04f);
+        // which way he faces in the sampled pose, from his shoulders
+        var right = Vector3.ProjectOnPlane(rUpper.position - lUpper.position, Vector3.up).normalized;
+        var fwd = Vector3.Cross(right, Vector3.up);
+        var mid = Vector3.ProjectOnPlane((lUpper.position + rUpper.position) / 2f, Vector3.up) + Vector3.up * feetY;
+
+        foreach (int side in new[] { -1, 1 })
+        {
+            bool left = side < 0;
+            var outward = right * side;
+            var hand = anim.GetBoneTransform(left ? HumanBodyBones.LeftHand : HumanBodyBones.RightHand);
+            var lower = anim.GetBoneTransform(left ? HumanBodyBones.LeftLowerArm : HumanBodyBones.RightLowerArm);
+            if (hand == null || lower == null) continue;
+            var finger = anim.GetBoneTransform(left ? HumanBodyBones.LeftMiddleProximal : HumanBodyBones.RightMiddleProximal);
+            var thumb = anim.GetBoneTransform(left ? HumanBodyBones.LeftThumbProximal : HumanBodyBones.RightThumbProximal);
+            if (finger == null && hand.childCount > 0) finger = hand.GetChild(0);
+            // where the fingers and thumb point, in the hand's own frame, so they can be re-aimed after the arm moves
+            var invHand = Quaternion.Inverse(hand.rotation);
+            var fingerLocal = invHand * (finger != null ? finger.position - hand.position : hand.position - lower.position);
+            var thumbLocal = thumb != null ? invHand * (thumb.position - hand.position) : Vector3.zero;
+
+            // wrist just off the side of the waist so the palm rests on it, elbow bent out to the side and a little back
+            var target = mid + outward * (waist + 0.04f) + Vector3.up * handY - fwd * 0.02f;
+            var pole = outward - fwd * 0.3f;
+            Reach(anim, left ? HumanBodyBones.LeftUpperArm : HumanBodyBones.RightUpperArm,
+                left ? HumanBodyBones.LeftLowerArm : HumanBodyBones.RightLowerArm,
+                left ? HumanBodyBones.LeftHand : HumanBodyBones.RightHand, target, pole);
+
+            // fingers wrap forward and down over the front of the hip, thumb toward the back
+            var wantFinger = (Vector3.down * 0.55f + fwd * 0.75f - outward * 0.15f).normalized;
+            var rot = Quaternion.FromToRotation(hand.rotation * fingerLocal, wantFinger) * hand.rotation;
+            if (thumbLocal.sqrMagnitude > 1e-6f)
+            {
+                var have = Vector3.ProjectOnPlane(rot * thumbLocal, wantFinger);
+                var want = Vector3.ProjectOnPlane(-fwd + Vector3.up * 0.3f, wantFinger);
+                if (have.sqrMagnitude > 1e-6f && want.sqrMagnitude > 1e-6f)
+                    rot = Quaternion.AngleAxis(Vector3.SignedAngle(have, want, wantFinger), wantFinger) * rot;
+            }
+            hand.rotation = rot;
+        }
+    }
+
+    // two-bone reach: bend the elbow toward the pole so the hand lands on the target
+    static void Reach(Animator anim, HumanBodyBones upperBone, HumanBodyBones lowerBone, HumanBodyBones handBone, Vector3 target, Vector3 pole)
+    {
+        var upper = anim.GetBoneTransform(upperBone);
+        var lower = anim.GetBoneTransform(lowerBone);
+        var hand = anim.GetBoneTransform(handBone);
+        if (upper == null || lower == null || hand == null) return;
+        float a = Vector3.Distance(upper.position, lower.position), b = Vector3.Distance(lower.position, hand.position);
+        var toTarget = target - upper.position;
+        float d = Mathf.Clamp(toTarget.magnitude, Mathf.Abs(a - b) + 0.001f, a + b - 0.001f);
+        var n = toTarget.normalized;
+        float cos = Mathf.Clamp((a * a + d * d - b * b) / (2f * a * d), -1f, 1f);
+        var bend = Vector3.ProjectOnPlane(pole, n).normalized;
+        var elbow = upper.position + n * (a * cos) + bend * (a * Mathf.Sqrt(1f - cos * cos));
+        upper.rotation = Quaternion.FromToRotation(lower.position - upper.position, elbow - upper.position) * upper.rotation;
+        lower.rotation = Quaternion.FromToRotation(hand.position - lower.position, upper.position + n * d - lower.position) * lower.rotation;
     }
 
     internal static void Aim(Animator anim, HumanBodyBones upperBone, HumanBodyBones lowerBone, HumanBodyBones handBone, Vector3 outward, Transform body, float lift)
