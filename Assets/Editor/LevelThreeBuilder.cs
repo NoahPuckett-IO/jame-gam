@@ -74,11 +74,13 @@ static partial class GroceryStoreBuilder
         cube.isStatic = false;
         cube.AddComponent<Carryable>();
         LowIceWall(root, xE, xE + fDepth + 0.5f, bz + 33f, FreezerHeight, 3f);
+        CheckpointAt(root, "Checkpoint L3-C2", new Vector3(xE + fDepth / 2, FreezerHeight, bz + 37f), new Vector3(fDepth, 4, 3), 0);
         devWarps.Add(("Ice Wall", new Vector3(xE + fDepth * 0.5f, FreezerHeight + 1f, bz + 23f), 0));
 
         var bags = Measure(new[] { ("k:bag", 0.25f), ("k:ice-cream-cup", 0.12f), ("IceCream", 0.15f), ("k:pizza-box", 0.35f) });
         for (int i = 0; i < 6 && bags.Count > 0; i++)
         {
+            if (i == 0 || i == 2) continue; // keep the checkpoint spots clear
             var t = bags[rng.Next(bags.Count)];
             var p = Spawn(t.prefab, root, rng.Next(360), t.size / Mathf.Max(t.bounds.x, t.bounds.y, t.bounds.z));
             PlaceOnFloor(p, new Vector3(xE + fDepth * (0.3f + 0.4f * (float)rng.NextDouble()), FreezerHeight, bz + 39f + i * 6f));
@@ -88,6 +90,8 @@ static partial class GroceryStoreBuilder
         RollingCan(root, new Vector3(xE + fDepth - 2.2f, FreezerHeight, bz + 41f), new Vector3(-(fDepth - 4f), 0, 0), 1.1f, 0f, 2.4f);
         RollingCan(root, new Vector3(xE + 2f, FreezerHeight, bz + 55f), new Vector3(fDepth - 4f, 0, 0), 0.9f, 0.5f, 2.4f);
 
+        CheckpointAt(root, "Checkpoint L3-C3", new Vector3(xE + fDepth / 2, FreezerHeight, bz + 50f), new Vector3(fDepth, 4, 3), 0);
+        CheckpointAt(root, "Checkpoint L3-C4", new Vector3(xE + fDepth / 2, FreezerHeight, crossZ - 2f), new Vector3(fDepth, 4, 3), 0);
         FreezingWater(root, x, waterA, finishZ);
         devWarps.Add(("Ice Crossing", new Vector3(xE + fDepth / 2, FreezerHeight + 1f, crossZ - 16f), 0));
         float[] xs = { x + 13f, x + 5f, x - 3f, x - 11f };

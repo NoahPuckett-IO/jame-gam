@@ -323,15 +323,14 @@ public class RoombaBoss : MonoBehaviour
         float roof = transform.position.y + top;
         if (flat.magnitude > radius + 0.7f || player.InCutscene) return;
 
+        if (phase != Phase.Hunt)
+        {
+            if (feet < roof + 0.1f) Zap();
+            return;
+        }
         if (feet > roof - 0.35f)
         {
-            if (phase == Phase.Hunt && flat.magnitude < 1.5f && player.IsGrounded) StartCoroutine(PowerDown());
-            else if (phase != Phase.Hunt)
-            {
-                var off = new Vector3(flat.x, 0f, flat.y).normalized;
-                if (off.sqrMagnitude < 0.1f) off = -transform.forward;
-                player.Knock(off * 22f + Vector3.up * 9f);
-            }
+            if (flat.magnitude < 1.5f && player.IsGrounded) StartCoroutine(PowerDown());
             return;
         }
         if (feet < roof - 0.6f) Zap();

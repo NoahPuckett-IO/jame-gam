@@ -22,6 +22,56 @@ static partial class GroceryStoreBuilder
         }
     }
 
+    // invisible walls in front of every shelf face so Henry can't wander into the cubbies; built after
+    // SettleProps so stocked products don't get shoved out. The freezer hall is skipped (solid freezers), and
+    // the shelf-climb hall only gets sealed outside the boards its route uses.
+    static void SealShelves(Transform store, List<float> walkways, ShelfInfo shelf, float aisleLength)
+    {
+        var root = new GameObject("Shelf Seals").transform;
+        root.SetParent(store);
+        float half = WalkwayWidth / 2, depth = shelf.SideDepth * 0.95f, top = ShelfHeight - 0.4f;
+        float zS = -aisleLength / 2, zN = aisleLength / 2;
+
+        void Face(float face, int dir, float y0, float y1, float z0, float z1, float inset)
+        {
+            if (y1 - y0 < 0.2f || z1 - z0 < 0.5f) return;
+            float x0 = face + dir * inset, x1 = face + dir * depth;
+            Seal(root, "Shelf Seal", new Vector3((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2),
+                new Vector3(Mathf.Abs(x1 - x0), y1 - y0, z1 - z0));
+        }
+
+        var hall = levelTwoHall;
+        for (int w = 0; w < walkways.Count; w++)
+        {
+            if (w == 2) continue;
+            var faces = new List<(float face, int dir)> { (walkways[w] + half, 1) };
+            if (w < walkways.Count - 1) faces.Add((walkways[w] - half, -1));
+            foreach (var (face, dir) in faces)
+            {
+                if (w != 1)
+                {
+                    Face(face, dir, 0f, top, zS, zN, 0f);
+                    continue;
+                }
+                Face(face, dir, 0f, hall.h1 - 0.15f, zS, zN, 0f);
+                var bands = new[] { (hall.h1, hall.h2), (hall.h2, hall.h3), (hall.h3, top) };
+                foreach (var (h, next) in bands)
+                {
+                    var open = NoStockZones
+                        .Where(b => Mathf.Abs(b.min.y - (h - 0.5f)) < 0.1f && (b.center.x > hall.x) == (dir > 0))
+                        .Select(b => (b.min.z - 6f, b.max.z + 6f)).OrderBy(r => r.Item1).ToList();
+                    float from = zS;
+                    foreach (var (a, b) in open)
+                    {
+                        Face(face, dir, h + 0.05f, next - 0.15f, from, Mathf.Min(a, zN), 0.8f);
+                        from = Mathf.Max(from, b);
+                    }
+                    Face(face, dir, h + 0.05f, next - 0.15f, from, zN, 0.8f);
+                }
+            }
+        }
+    }
+
     static readonly List<GameObject> settleQueue = new List<GameObject>();
     static readonly HashSet<GameObject> settleForced = new HashSet<GameObject>();
 

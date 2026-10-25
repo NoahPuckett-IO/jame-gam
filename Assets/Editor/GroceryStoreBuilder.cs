@@ -194,6 +194,7 @@ static partial class GroceryStoreBuilder
         }
 
         SettleProps();
+        SealShelves(store.transform, walkways, shelf, aisleLength);
         AddGrime(store.transform, left, right, depth);
         MakeProductsMatte(store.transform);
 
