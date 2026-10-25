@@ -16,6 +16,8 @@ public class PlayerInteractor : MonoBehaviour
     Carryable held;
     bool busy;
 
+    public bool Busy => busy || held != null;
+
     void Awake()
     {
         player = GetComponent<PlayerController>();
@@ -27,7 +29,7 @@ public class PlayerInteractor : MonoBehaviour
 
     void Update()
     {
-        if (player.InCutscene || busy || !player.IsGrounded) return;
+        if (player.InCutscene || player.Attached || busy || !player.IsGrounded) return;
         bool pressed = false;
         foreach (var c in interact.controls)
             if (c is UnityEngine.InputSystem.Controls.ButtonControl b && b.wasPressedThisFrame) pressed = true;

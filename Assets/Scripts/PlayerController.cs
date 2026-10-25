@@ -35,7 +35,7 @@ public class PlayerController : MonoBehaviour
     public bool InCutscene { get; private set; }
     Vector3 scriptedMove;
 
-    public bool IsGrounded => controller != null && controller.isGrounded;
+    public bool IsGrounded => controller != null && controller.enabled && controller.isGrounded;
     public float WalkSpeed => walkSpeed;
     public float DashReady => Mathf.Clamp01(1f - (dashReadyAt - Time.time) / dashCooldown);
     public event System.Action Dashed;
@@ -75,6 +75,32 @@ public class PlayerController : MonoBehaviour
         planarVelocity = knockback = Vector3.zero;
         iceZones = 0;
         platform = null;
+        Attached = false;
+    }
+
+    // ziplines, ladders and slides drive the player directly while it's attached
+    public bool Attached { get; private set; }
+    public Vector2 MoveInput => moveAction.ReadValue<Vector2>();
+    public bool JumpPressed => jumpAction.WasPressedThisFrame();
+
+    public void Attach()
+    {
+        Attached = true;
+        controller.enabled = false;
+        planarVelocity = knockback = Vector3.zero;
+        verticalVelocity = 0f;
+        platform = null;
+        dashUntil = 0f;
+    }
+
+    public void Detach(Vector3 velocity)
+    {
+        if (!Attached) return;
+        Attached = false;
+        controller.enabled = true;
+        planarVelocity = new Vector3(velocity.x, 0f, velocity.z);
+        verticalVelocity = velocity.y;
+        airControl = true;
     }
 
     public void SetCheckpoint(Vector3 position, Quaternion rotation)
@@ -127,6 +153,17 @@ public class PlayerController : MonoBehaviour
         if (transform.position.y < killHeight || (!InCutscene && Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame))
         {
             Respawn();
+            return;
+        }
+
+        if (Attached)
+        {
+            if (!InCutscene)
+            {
+                Vector2 look = lookAction.ReadValue<Vector2>() * lookSensitivity * GameSettings.Sensitivity;
+                yaw += look.x;
+                pitch = Mathf.Clamp(pitch - look.y, minPitch, maxPitch);
+            }
             return;
         }
 

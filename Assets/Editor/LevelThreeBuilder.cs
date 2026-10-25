@@ -62,14 +62,20 @@ static partial class GroceryStoreBuilder
         IceGatePuzzle(root, x, wallZ, rng);
         CheckpointAt(root, "Checkpoint L3-B", new Vector3(x, 0, wallZ + 5f), new Vector3(WalkwayWidth, 4, 3), 0);
 
-        WhippedCream(root, new Vector3(x + 7f, 0.15f, bz), 24f);
-        IceTower(root, new Vector3(x + 11f, 0, bz + 7f), 12f);
-        WhippedCream(root, new Vector3(x + 11f, 12f, bz + 7f), 24f);
-        IceTower(root, new Vector3(x + 14.5f, 0, bz + 14f), 24f);
-        WhippedCream(root, new Vector3(x + 14.5f, 24f, bz + 14f), 24f);
-        CheckpointAt(root, "Checkpoint L3-C", new Vector3(xE + fDepth / 2, FreezerHeight, bz + 22f), new Vector3(fDepth, 4, 4), 0);
+        // whipped cream bounces up the left (west) freezers, then a zipline carries Henry across the aisle
+        WhippedCream(root, new Vector3(x - 7f, 0.15f, bz), 24f);
+        IceTower(root, new Vector3(x - 11f, 0, bz + 7f), 12f);
+        WhippedCream(root, new Vector3(x - 11f, 12f, bz + 7f), 24f);
+        IceTower(root, new Vector3(x - 14.5f, 0, bz + 14f), 24f);
+        WhippedCream(root, new Vector3(x - 14.5f, 24f, bz + 14f), 24f);
+        CheckpointAt(root, "Checkpoint L3-C", new Vector3(xW - fDepth / 2, FreezerHeight, bz + 18f), new Vector3(fDepth, 4, 4), 0);
 
-        var cube = IceCube(root, new Vector3(xE + fDepth * 0.5f, FreezerHeight + 0.95f, bz + 27f), new Vector3(1.9f, 1.9f, 1.9f), bob: 0);
+        float zipZ = bz + 25f;
+        ZiplineAcross(root, new Vector3(xW - 3f, FreezerHeight, zipZ), new Vector3(xE + fDepth * 0.5f, FreezerHeight, zipZ));
+        CheckpointAt(root, "Checkpoint L3-Zip", new Vector3(xE + fDepth / 2, FreezerHeight, zipZ), new Vector3(fDepth, 4, 4), 0);
+        devWarps.Add(("Zipline", new Vector3(xW - 3f, FreezerHeight + 1f, zipZ - 9f), 0));
+
+        var cube = IceCube(root, new Vector3(xE + fDepth * 0.5f, FreezerHeight + 0.95f, bz + 29f), new Vector3(1.9f, 1.9f, 1.9f), bob: 0);
         cube.name = "Carry Ice Cube";
         cube.isStatic = false;
         cube.AddComponent<Carryable>();
@@ -129,9 +135,75 @@ static partial class GroceryStoreBuilder
         Seal(root, "Freezer Back West", new Vector3(xW - fDepth - 0.5f, (FreezerHeight + WallHeight) / 2, 0), new Vector3(1f, WallHeight - FreezerHeight, aisleLength));
         CheckpointAt(root, "Checkpoint L3-D", new Vector3(xW - fDepth / 2, FreezerHeight, crossZ + 4f), new Vector3(fDepth, 4, 4), 0);
 
-        Slide(root, new Vector3(xW - 2f, FreezerHeight, crossZ + 12f), new Vector3(x + 10f, 0.4f, zN - 6f), 5f);
+        Slide(root, new Vector3(xW - 2f, FreezerHeight, crossZ + 12f), new Vector3(x + 10f, 0.4f, zN - 6f), 5f, exitSpeed: 14f);
         foreach (var r in root.Find("Baking Tray Slide").GetComponentsInChildren<Renderer>()) r.sharedMaterial = ice;
         root.Find("Baking Tray Slide").name = "Ice Slide";
+    }
+
+    // ice steps up to a launch block on one freezer top, a floss line across the aisle, and a handle to grab
+    static void ZiplineAcross(Transform parent, Vector3 from, Vector3 to)
+    {
+        var root = new GameObject("Zipline").transform;
+        root.SetParent(parent);
+        const float step = 1.6f, deck = 3.2f, reach = 2.3f;
+        var stepBlock = IceCube(root, from + new Vector3(0, step / 2, -4f), new Vector3(3.2f, step, 3.2f), bob: 0);
+        stepBlock.transform.rotation = Quaternion.identity;
+        var launch = IceCube(root, from + Vector3.up * deck / 2, new Vector3(4.4f, deck, 4.4f), bob: 0);
+        launch.transform.rotation = Quaternion.identity;
+        launch.name = "Zipline Launch";
+
+        var start = from + Vector3.up * (deck + reach);
+        var end = to + Vector3.up * 3.35f;
+        var dir = (end - start).normalized;
+        var postA = start - dir * 1.6f;
+        var postB = end + dir * 1.6f;
+        var wood = GetMaterial("Chopstick Wood", new Color(0.78f, 0.6f, 0.38f));
+        void Post(Vector3 topAt, float floorY)
+        {
+            float h = topAt.y + 0.5f - floorY;
+            var p = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            p.name = "Chopstick Post";
+            p.transform.SetParent(root);
+            p.transform.position = new Vector3(topAt.x, floorY + h / 2, topAt.z);
+            p.transform.localScale = new Vector3(0.45f, h / 2, 0.45f);
+            p.GetComponent<Renderer>().sharedMaterial = wood;
+            var b = IceCube(root, new Vector3(topAt.x, floorY + 0.6f, topAt.z), new Vector3(1.6f, 1.2f, 1.6f), bob: 0);
+            b.name = "Post Base";
+        }
+        Post(postA, from.y);
+        Post(postB, to.y);
+
+        var floss = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        floss.name = "Floss Line";
+        floss.transform.SetParent(root);
+        floss.transform.SetPositionAndRotation((postA + postB) / 2, Quaternion.FromToRotation(Vector3.up, postB - postA));
+        floss.transform.localScale = new Vector3(0.09f, (postB - postA).magnitude / 2, 0.09f);
+        floss.GetComponent<Renderer>().sharedMaterial = GetMaterial("Floss", new Color(0.92f, 0.95f, 0.98f));
+        Object.DestroyImmediate(floss.GetComponent<Collider>());
+
+        var handle = new GameObject("Zipline Handle").transform;
+        handle.SetParent(root);
+        handle.SetPositionAndRotation(start + Vector3.down * 0.3f, Quaternion.LookRotation(new Vector3(dir.x, 0, dir.z)));
+        var plastic = GetMaterial("Bread Clip Blue", new Color(0.15f, 0.45f, 0.95f));
+        void Part(PrimitiveType type, string name, Vector3 local, Vector3 scale, Vector3 euler)
+        {
+            var g = GameObject.CreatePrimitive(type);
+            g.name = name;
+            g.transform.SetParent(handle, false);
+            g.transform.localPosition = local;
+            g.transform.localScale = scale;
+            g.transform.localRotation = Quaternion.Euler(euler);
+            g.GetComponent<Renderer>().sharedMaterial = plastic;
+            Object.DestroyImmediate(g.GetComponent<Collider>());
+        }
+        Part(PrimitiveType.Cylinder, "Grip", Vector3.zero, new Vector3(0.11f, 0.65f, 0.11f), new Vector3(0, 0, 90));
+        Part(PrimitiveType.Cube, "Strap", new Vector3(0, 0.17f, 0), new Vector3(0.08f, 0.32f, 0.08f), Vector3.zero);
+        Part(PrimitiveType.Cube, "Trolley", new Vector3(0, 0.32f, 0), new Vector3(0.22f, 0.16f, 0.4f), Vector3.zero);
+        foreach (var t in handle.GetComponentsInChildren<Transform>()) t.gameObject.isStatic = false;
+
+        root.gameObject.AddComponent<Zipline>().Setup(start, end, handle);
+        TutorialZoneAt(root, from + Vector3.up * (deck + 3f), new Vector3(7f, 6f, 8f), "hand", "ZIPLINE",
+            "Stand under the handle and press E to grab on. Jump to let go early.", "E");
     }
 
     // a wall of ice blocks across a freezer top, just too tall to jump

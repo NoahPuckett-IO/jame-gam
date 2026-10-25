@@ -128,6 +128,9 @@ static class CharacterSetup
         State("Push", "Push_Loop");
         State("Death", "Death01");
         State("LookAround", "Idle_Talking_Loop");
+        State("Hang", "Jump_Loop", 0.6f);
+        State("Climb", "Idle_Loop", 0.5f);
+        State("Lie", "Idle_Loop", 0.35f);
 
         AnimatorStateTransition T(AnimatorState from, AnimatorState to, float duration, bool exit = false, float exitTime = 0.9f)
         {

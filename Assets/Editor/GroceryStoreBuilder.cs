@@ -312,6 +312,7 @@ static partial class GroceryStoreBuilder
 
         player.AddComponent<PlayerAnimator>().Setup(animator);
         model.AddComponent<CarryIK>();
+        model.AddComponent<LimbTargets>();
         AddGrounder(model, animator, -1f - player.GetComponent<CharacterController>().skinWidth);
         AddSounds(player, animator);
         return model;
