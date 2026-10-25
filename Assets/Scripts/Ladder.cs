@@ -17,7 +17,8 @@ public class Ladder : PlayerRide
     Vector3 mountFrom, exitFrom;
     float lastRung;
 
-    Vector3 Right => Vector3.Cross(Vector3.up, outward).normalized;
+    // the climber's right while facing the ladder (they face -outward)
+    Vector3 Right => Vector3.Cross(outward, Vector3.up).normalized;
     Vector3 BodyAt(float feetHeight) => foot + outward * StandOff + Vector3.up * (feetHeight + 1f);
     float RungY(int i) => foot.y + firstRung + i * rungSpacing;
 
