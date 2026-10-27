@@ -41,8 +41,6 @@ static partial class GroceryStoreBuilder
         var director = root.gameObject.AddComponent<FallingItemsDirector>();
         director.Setup(list.ToArray(), x, half, zN - 8f, zS + 8f, DashMaterial());
 
-        TutorialZoneAt(root, new Vector3(x, 5, zN - 4f), new Vector3(WalkwayWidth, 10, 10f), "run", "RUN!",
-            "Dodge the falling objects!", "SHIFT", "WASD");
         CheckpointAt(root, "Checkpoint L4-A", new Vector3(x, 0, zN * 0.35f), new Vector3(WalkwayWidth, 4, 3), 180);
         CheckpointAt(root, "Checkpoint L4-B", new Vector3(x, 0, zS * 0.35f), new Vector3(WalkwayWidth, 4, 3), 180);
         ShelfGuards(root, x, zS, zN);

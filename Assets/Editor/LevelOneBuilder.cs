@@ -7,27 +7,119 @@ static partial class GroceryStoreBuilder
 {
     static (RectTransform top, RectTransform bottom) cinematicBars;
 
+    // Level one climbs all over the bakery aisle. The walkway floor is cut into rooms by box barricades, and every
+    // way forward is up a shelf and back down again:
+    //   A  floor: carry the bean can onto the ruler lever's lid to hold it down, walk up it to the east first shelf
+    //      east shelf 1: hop the jars, dodge the rolling can, then the plank ramp up to east shelf 2
+    //      east shelf 2: a giant wooden spoon slopes up across the aisle to west shelf 3 (the floor below is a sticky
+    //      soda spill)
+    //      west shelf 3: a cereal box blocks the way, so up a ladder onto the top of the shelf and down another one
+    //      past it; three cans stood on three spots drop the ladder back up to the paper plane, which loops round
+    //      over the aisle and lands past the second blocked cubby, where the baking tray slide carries Henry down
+    //      three shelves, over a barricade, to room C
+    //   C  floor: the ladder up the east side hangs out of reach; carry a box under it to climb to east shelf 1
+    //      east shelf 1: past the rolling cans to a second slide back down to room D and the way out
+    static void PlanLevelOne(List<Transform> aisles, List<float> walkways)
+    {
+        var t = levelTwoHall;
+        var hall = new Hall
+        {
+            x = walkways[0], xW = walkways[0] - WalkwayWidth / 2, xE = walkways[0] + WalkwayWidth / 2,
+            boardDepth = t.boardDepth, h1 = t.h1, h2 = t.h2, h3 = t.h3,
+        };
+        MeasureShelfTop(aisles[0], ref hall);
+        levelOneHall = hall;
+        RouteBoard(hall, false, hall.h1, -88f, -46f);
+        RouteBoard(hall, false, hall.h2, -34f, -12f);
+        RouteBoard(hall, true, hall.h3, -18f, 35f);
+        RouteBoard(hall, false, hall.h1, 60f, 100f);
+    }
+
+    const float L1BarrierA = -72f, L1BarrierB = 34f, L1BarrierC = 76f;
+
     static void BuildLevelOne(Transform store, List<float> walkways, float aisleLength, float depth, Transform spawn,
         out Transform wakeInside, out Transform wakeOutside)
     {
         var level = new GameObject("Level One").transform;
         level.SetParent(store);
 
-        float xc = walkways[0], w = WalkwayWidth;
-        float start = -aisleLength / 2;
+        var hall = levelOneHall;
+        float xc = hall.x, w = WalkwayWidth, xW = hall.xW, xE = hall.xE;
+        float zS = -aisleLength / 2, zN = aisleLength / 2;
+        var rng = new System.Random(101);
 
         BuildTutorialHud();
         cinematicBars = BuildCinematicBars();
 
         WakeUpBox(level, spawn.position, out wakeInside, out wakeOutside);
-        TutorialZoneAt(level, new Vector3(xc, 5, spawn.position.z + 14f), new Vector3(w, 10, 24f), "walk", "WHERE AM I?",
-            "Walk with WASD and look with the mouse. Space jumps, and Shift does a dash that recharges in five seconds.", "WASD", "SHIFT", "SPACE");
+        CheckpointAt(level, "Checkpoint L1-A", new Vector3(xc, 0, zS + 4f), new Vector3(w, 4, 3), 0);
 
-        BuildSeesawPuzzle(level, xc, w, start + aisleLength * 0.3f);
-        BuildStepPuzzle(level, xc, w, start + aisleLength * 0.52f);
-        BuildRampPuzzle(level, xc, w, start + aisleLength * 0.84f);
-        ScatterLitter(level, xc, w, start + 12f, start + aisleLength - 6f, 21);
-        ShelfGuards(level, xc, start, start + aisleLength);
+        // room A
+        ScatterLitter(level, xc, w, zS + 10f, L1BarrierA - 8f, 21, 28, onlySide: -1);
+        ScatterLitter(level, xc, w, zS + 10f, -104f, 22, 8, onlySide: 1);
+        LeverLift(level, hall, -92f);
+        Barricade(level, xc, w, L1BarrierA, 2, true, WallHeight, rng);
+
+        // east shelf 1 -> 2
+        CheckpointAt(level, "Checkpoint L1-B", new Vector3(xE + 3.5f, hall.h1, -76f), new Vector3(6, 4, 4), 0);
+        ShelfJar(level, new Vector3(xE + 2.5f, hall.h1, -69f), 1.3f);
+        ShelfJar(level, new Vector3(xE + 4.8f, hall.h1, -69.6f), 1.1f);
+        RollingCan(level, new Vector3(xE + 5.6f, hall.h1, -61f), new Vector3(-4.4f, 0, 0), 1.2f, 0.25f);
+        Ramp(level, hall, westSide: false, hall.h1, -50f, hall.h2, -32f);
+        CheckpointAt(level, "Checkpoint L1-C", new Vector3(xE + 3.5f, hall.h2, -24f), new Vector3(6, 4, 4), 0);
+        devWarps.Add(("L1 Ramp", new Vector3(xE + 3.5f, hall.h1 + 1f, -72f), 0));
+
+        // the sticky floor under the high part of the climb
+        var spill = new GameObject("Sticky Soda Spill").AddComponent<BoxCollider>();
+        spill.transform.SetParent(level);
+        spill.isTrigger = true;
+        spill.transform.position = new Vector3(xc, 0.4f, (L1BarrierA + L1BarrierB) / 2);
+        spill.size = new Vector3(w + 1f, 0.8f, L1BarrierB - L1BarrierA - 9f);
+        spill.gameObject.AddComponent<Hazard>();
+        SodaSpill(level, xc, w, L1BarrierA + 5f, L1BarrierB - 5f, rng);
+
+        // up across the aisle to the west
+        SpoonBridge(level, new Vector3(xE + 6.3f, hall.h2, -16f), new Vector3(xW - 3f, hall.h3, -16f));
+        devWarps.Add(("L1 Spoon", new Vector3(xE + 3.5f, hall.h2 + 1f, -24f), -90));
+        CheckpointAt(level, "Checkpoint L1-D", new Vector3(xW - 3.5f, hall.h3, -11f), new Vector3(6, 4, 4), 0);
+
+        // west shelf 3: over the top of the shelf, the can spots, the plane
+        ShelfTopRoute(level, hall, rng);
+        devWarps.Add(("L1 Top", new Vector3(xW - 3.5f, hall.h3 + 1f, -10f), 0));
+        CheckpointAt(level, "Checkpoint L1-E", new Vector3(xW - 3.5f, hall.h3, 3f), new Vector3(6, 4, 3), 0);
+        CanPuzzle(level, hall);
+        devWarps.Add(("L1 Cans", new Vector3(xW - 3.5f, hall.h3 + 1f, 4f), 0));
+        var landing = new Vector3(xW - 3f, hall.h3, 23f);
+        PaperPlaneRide(level, hall, landing);
+        devWarps.Add(("L1 Plane", new Vector3(xW - hall.back - 2.4f, hall.top + 1f, 14f), 0));
+
+        // the long slide down
+        CheckpointAt(level, "Checkpoint L1-F", new Vector3(xW - 3.5f, hall.h3, 27.5f), new Vector3(6, 4, 2.5f), 0);
+        Slide(level, new Vector3(xW - 1.5f, hall.h3, 29f), new Vector3(xc + 2f, 0.4f, 62f), 5f, exitSpeed: 11f);
+        Barricade(level, xc, w, L1BarrierB, 2, false, 17f, rng);
+        devWarps.Add(("L1 Slide", new Vector3(xW - 3.5f, hall.h3 + 1f, 26f), 0));
+
+        // room C: the ladder that hangs out of reach
+        CheckpointAt(level, "Checkpoint L1-G", new Vector3(xc + 4f, 0, 68f), new Vector3(w, 4, 4), 0);
+        // low enough that standing on one box puts its bottom rung at Henry's feet
+        KitLadder(level, new Vector3(xE, 0, 68f), Vector3.left, 1.6f, hall.h1, new Vector3(xE + 2.2f, hall.h1, 68f));
+        CarryBox(level, new Vector3(xc - 9f, 0, 47f), 1.6f);
+        CarryBox(level, new Vector3(xc - 12f, 0, 57f), 1.6f);
+        ScatterLitter(level, xc, w, L1BarrierB + 6f, L1BarrierC - 8f, 23, 26, onlySide: -1);
+        for (int i = 0; i < 3; i++)
+            Fallen(level, i + 2, Quaternion.Euler(0, rng.Next(360), 90), new Vector3(xc - 13f + i * 1.5f, 0, 40f + i * 7f));
+        Barricade(level, xc, w, L1BarrierC, 2, true, WallHeight, rng);
+        devWarps.Add(("L1 Ladder", new Vector3(xc, 1, 56f), 90));
+
+        // east shelf 1, the cans, the slide to the exit
+        CheckpointAt(level, "Checkpoint L1-H", new Vector3(xE + 3.5f, hall.h1, 72f), new Vector3(6, 4, 4), 0);
+        RollingCan(level, new Vector3(xE + 1.2f, hall.h1, 81f), new Vector3(4.4f, 0, 0), 1.0f, 0f);
+        RollingCan(level, new Vector3(xE + 5.6f, hall.h1, 87f), new Vector3(-4.4f, 0, 0), 0.9f, 0.5f);
+        Slide(level, new Vector3(xE + 2.5f, hall.h1, 95f), new Vector3(xc - 6f, 0.4f, 103f), 4.5f, exitSpeed: 9f);
+
+        // room D
+        ScatterLitter(level, xc, w, L1BarrierC + 6f, zN - 3f, 37, 24, onlySide: 1);
+        WetFloorSign(level, new Vector3(xc - 14f, 0, 90f), 160f);
 
         float northCorridor = (aisleLength / 2 + depth / 2 - CoolerDepth) / 2;
         float southCorridor = -northCorridor;
@@ -61,6 +153,141 @@ static partial class GroceryStoreBuilder
             var respawn = Waypoint(cp, "Respawn", new Vector3(walkways[k], 1, south ? southCorridor : northCorridor), -90);
             cp.gameObject.AddComponent<Checkpoint>().Setup(respawn);
         }
+    }
+
+    // a ruler balanced on a bean can beside the east shelf, with a jar lid hung level under its near (south) end.
+    // Standing on the lid tips the ruler's far end up to the first shelf, but it swings back the moment the lid is
+    // empty, so Henry has to bring the heavy can along and leave it on the lid before walking up
+    static void LeverLift(Transform level, Hall hall, float pivotZ)
+    {
+        var root = new GameObject("Puzzle - Lever Lift").transform;
+        root.SetParent(level);
+        const float near = 4.5f, far = 12f, width = 3f, thick = 0.4f, panRadius = 2.7f;
+        float x = hall.xE - width / 2 - 0.25f;
+
+        var canPrefab = BeanCanBuilder.GetOrCreate();
+        var probe = Spawn(canPrefab, null, 0, 1);
+        var pb = GetBounds(probe);
+        Object.DestroyImmediate(probe);
+        float canD = 2.4f;
+        float canScale = canD / Mathf.Max(pb.size.x, pb.size.z);
+        float pivotY = canD + thick / 2;
+        var can = Spawn(canPrefab, root, 0, canScale);
+        can.name = "Fulcrum Can";
+        can.transform.localScale = new Vector3(can.transform.localScale.x, can.transform.localScale.y * width * 1.6f / (pb.size.y * canScale), can.transform.localScale.z);
+        can.transform.rotation = Quaternion.Euler(0, 0, 90) * can.transform.rotation;
+        PlaceOnFloor(can, new Vector3(x, 0, pivotZ));
+        AddBoxColliders(can);
+
+        float rest = Mathf.Asin((pivotY - thick / 2) / far) * Mathf.Rad2Deg;
+        float tipped = -Mathf.Asin((pivotY - thick / 2) / near) * Mathf.Rad2Deg;
+        var pivot = Plank(root, "Lever Ruler", new Vector3(x, pivotY, pivotZ), near, far, width, thick,
+            GetMaterial("Ruler", new Color(0.86f, 0.72f, 0.38f)), ticks: true);
+
+        var pan = new GameObject("Jar Lid").transform;
+        pan.SetParent(root);
+        var lidMat = GetMaterial("Jar Lid Gold", new Color(0.85f, 0.65f, 0.2f));
+        lidMat.SetFloat("_Metallic", 0.75f);
+        lidMat.SetFloat("_Smoothness", 0.55f);
+        var lid = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        lid.name = "Lid";
+        Object.DestroyImmediate(lid.GetComponent<Collider>());
+        lid.transform.SetParent(pan, false);
+        lid.transform.localPosition = new Vector3(0, -0.15f, -panRadius + 0.3f);
+        lid.transform.localScale = new Vector3(panRadius * 2, 0.15f, panRadius * 2);
+        lid.GetComponent<Renderer>().sharedMaterial = lidMat;
+        var rim = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        rim.name = "Lid Rim";
+        Object.DestroyImmediate(rim.GetComponent<Collider>());
+        rim.transform.SetParent(pan, false);
+        rim.transform.localPosition = new Vector3(0, -0.05f, -panRadius + 0.3f);
+        rim.transform.localScale = new Vector3(panRadius * 2 + 0.3f, 0.12f, panRadius * 2 + 0.3f);
+        rim.GetComponent<Renderer>().sharedMaterial = GetMaterial("Jar Lid Rim", new Color(0.55f, 0.4f, 0.12f));
+        var col = pan.gameObject.AddComponent<BoxCollider>();
+        col.center = new Vector3(0, -0.15f, -panRadius + 0.3f);
+        col.size = new Vector3(panRadius * 1.8f, 0.3f, panRadius * 1.8f);
+        foreach (var t in root.GetComponentsInChildren<Transform>()) t.gameObject.isStatic = false;
+        Kinematic(pan.gameObject);
+
+        var seesaw = pivot.gameObject.AddComponent<Seesaw>();
+        seesaw.Setup(pivot, rest, tipped, far, thick, 0f);
+        seesaw.SetupBalance(pan, near);
+        pivot.rotation = Quaternion.Euler(rest, 0, 0);
+        pan.position = pivot.TransformPoint(new Vector3(0, thick / 2, -near));
+
+        // the weight: a big can of beans by the start
+        var weight = Spawn(canPrefab, root, 25f, 2.8f / (pb.size.y));
+        weight.name = "Heavy Can";
+        PlaceOnFloor(weight, new Vector3(hall.x + 7f, 0, pivotZ - 10f));
+        AddBoxColliders(weight);
+        weight.isStatic = false;
+        weight.AddComponent<Carryable>();
+        devWarps.Add(("L1 Lever", new Vector3(hall.x + 4f, 1, pivotZ - 14f), 0));
+    }
+
+    // a wall of boxes across the walkway, taped boxes below, with an invisible seal up to sealTop
+    static void Barricade(Transform parent, float xc, float width, float z, int layers, bool looseTop, float sealTop, System.Random rng)
+    {
+        var root = new GameObject("Barricade").transform;
+        root.SetParent(parent);
+        float box = 0.45f * Scale;
+        int cols = Mathf.CeilToInt(width / box);
+        float cell = width / cols;
+        float R(float a, float b) => a + (float)rng.NextDouble() * (b - a);
+        float top = 0;
+        for (int l = 0; l < layers; l++)
+            for (int c = 0; c < cols; c++)
+            {
+                float size = l == 0 ? cell * 0.99f : cell * R(0.86f, 0.95f);
+                var at = new Vector3(xc - width / 2 + (c + 0.5f) * cell + (l == 0 ? 0 : R(-0.4f, 0.4f)), l * cell * 0.99f, z + (l == 0 ? 0 : R(-0.5f, 0.5f)));
+                var b = CardboardBox(root, l == 0 || rng.NextDouble() < 0.7 ? BoxKind.Sealed : BoxKind.SealedLong, size, l == 0 ? R(-1.5f, 1.5f) : R(-8f, 8f), at);
+                if (l > 0) SettleLater(b, force: true);
+                top = Mathf.Max(top, GetBounds(b).max.y);
+            }
+        if (looseTop)
+            for (int c = 0; c < cols; c++)
+            {
+                if (rng.NextDouble() < 0.45) continue;
+                var b = CardboardBox(root, rng.NextDouble() < 0.5 ? BoxKind.Ajar : BoxKind.Open, cell * R(0.55f, 0.75f), R(0f, 360f),
+                    new Vector3(xc - width / 2 + (c + 0.5f) * cell, top + 0.4f, z + R(-1f, 1f)));
+                SettleLater(b, force: true);
+            }
+        Seal(root, "Barricade Seal", new Vector3(xc, sealTop / 2, z), new Vector3(width + 1f, sealTop, cell));
+        // switched on after the physics settle, or the loose boxes get shoved out of it and left hanging
+        var seal = root.GetChild(root.childCount - 1).gameObject;
+        seal.SetActive(false);
+        lateSeals.Add(seal);
+    }
+
+    static readonly List<GameObject> lateSeals = new List<GameObject>();
+
+    // a stack of taped boxes from the floor up to exactly topY
+    static void BoxTower(Transform parent, Vector3 floorAt, float topY, float size, System.Random rng)
+    {
+        var root = new GameObject("Box Tower").transform;
+        root.SetParent(parent);
+        int n = Mathf.Max(1, Mathf.RoundToInt(topY / size));
+        float h = topY / n;
+        for (int i = 0; i < n; i++)
+        {
+            var b = CardboardBox(root, BoxKind.Sealed, h, (float)rng.NextDouble() * 10f - 5f, floorAt + Vector3.up * i * h);
+            b.transform.localScale = Vector3.Scale(b.transform.localScale, new Vector3(size / h, 1f, size / h));
+            PlaceOnFloor(b, floorAt + Vector3.up * i * h);
+        }
+        Solid(root, "Tower Collider", floorAt + Vector3.up * topY / 2, new Vector3(size, topY, size));
+    }
+
+    // a jar standing on a shelf board, small enough to hop over
+    static void ShelfJar(Transform parent, Vector3 at, float height)
+    {
+        var jar = LoadModel("k:honey") ?? LoadModel("k:peanut-butter");
+        if (jar == null) return;
+        var j = Spawn(jar, parent, (at.x * 31f + at.z * 17f) % 360f, 1f);
+        j.name = "Jar";
+        var b = GetBounds(j);
+        j.transform.localScale *= height / b.size.y;
+        PlaceOnFloor(j, at);
+        AddBoxColliders(j);
     }
 
     static Transform Waypoint(Transform parent, string name, Vector3 pos, float yaw)
@@ -159,10 +386,10 @@ static partial class GroceryStoreBuilder
             float yaw = face < 0 ? 0 : 180;
             var outward = new Vector3(0, 0, face * (D / 2 + 0.06f));
             var right = face < 0 ? 1f : -1f;
-            MakeText(root.transform, new Vector3(0, H * 0.3f, 0) + outward, yaw, s.brand, W * 0.8f, H * 0.2f, Color.white);
-            MakeText(root.transform, new Vector3(0, H * 0.165f, 0) + outward, yaw, s.tag, W * 0.6f, H * 0.035f, new Color(1f, 1f, 0.85f));
-            MakeText(root.transform, new Vector3(right * W * 0.324f, H * 0.083f, 0) + outward, yaw, "NEW!", W * 0.16f, H * 0.04f, Color.white);
-            MakeText(root.transform, new Vector3(0, -H * 0.462f, 0) + outward, yaw, "FAMILY SIZE  •  NET WT 18 OZ (510g)", W * 0.8f, H * 0.03f, Color.white);
+            MakeText(root.transform, new Vector3(0, H * 0.3f, 0) + outward, yaw, s.brand, W * 0.8f, H * 0.2f, Color.white, lit: true);
+            MakeText(root.transform, new Vector3(0, H * 0.165f, 0) + outward, yaw, s.tag, W * 0.6f, H * 0.035f, new Color(1f, 1f, 0.85f), lit: true);
+            MakeText(root.transform, new Vector3(right * W * 0.324f, H * 0.083f, 0) + outward, yaw, "NEW!", W * 0.16f, H * 0.04f, Color.white, lit: true);
+            MakeText(root.transform, new Vector3(0, -H * 0.462f, 0) + outward, yaw, "FAMILY SIZE  •  NET WT 18 OZ (510g)", W * 0.8f, H * 0.03f, Color.white, lit: true);
         }
         foreach (var t in root.GetComponentsInChildren<Transform>()) t.gameObject.isStatic = false;
         return root;
@@ -226,12 +453,6 @@ static partial class GroceryStoreBuilder
         outside = Waypoint(root, "Outside", new Vector3(c.x, 1f, c.z + H / 2 + 9f), 0);
     }
 
-    static GameObject Box2(string name, Transform parent, Vector3 pos, Vector3 size, Material mat)
-    {
-        Box(name, parent, pos, size, mat);
-        return parent.GetChild(parent.childCount - 1).gameObject;
-    }
-
     static void SpillPieces(Transform parent, Vector3 center, float radius, int count)
     {
         var ring = LoadModel("k:donut");
@@ -251,7 +472,7 @@ static partial class GroceryStoreBuilder
         }
     }
 
-    static void ScatterLitter(Transform parent, float xc, float w, float z0, float z1, int seed)
+    static void ScatterLitter(Transform parent, float xc, float w, float z0, float z1, int seed, int count = 70, int onlySide = 0)
     {
         var root = new GameObject("Litter").transform;
         root.SetParent(parent);
@@ -264,9 +485,9 @@ static partial class GroceryStoreBuilder
         if (items.Count == 0) return;
         var rng = new System.Random(seed);
         var receipt = GetMaterial("Receipt", new Color(0.96f, 0.95f, 0.9f));
-        for (int i = 0; i < 70; i++)
+        for (int i = 0; i < count; i++)
         {
-            float side = rng.Next(2) == 0 ? -1 : 1;
+            float side = onlySide != 0 ? onlySide : rng.Next(2) == 0 ? -1 : 1;
             float edge = (float)rng.NextDouble();
             float x = xc + side * (w / 2 - 1f - edge * edge * w * 0.4f);
             float z = Mathf.Lerp(z0, z1, (float)rng.NextDouble());
@@ -289,65 +510,6 @@ static partial class GroceryStoreBuilder
             PlaceOnFloor(p, new Vector3(x, 0, z));
             SettleLater(p);
         }
-    }
-
-    static void BuildSeesawPuzzle(Transform level, float xc, float w, float barrierZ)
-    {
-        var root = new GameObject("Puzzle 1 - Ruler").transform;
-        root.SetParent(level);
-        float xL = xc - w / 2, xR = xc + w / 2;
-
-        var gate = CerealBox(root, 0);
-        gate.name = "Gate Cereal Box";
-        gate.transform.rotation = Quaternion.Euler(0, 0, 90);
-        PlaceOnFloor(gate, new Vector3(xc, 0, barrierZ));
-        gate.AddComponent<Rigidbody>().isKinematic = true;
-        var gb = GetBounds(gate);
-        var lifted = gate.AddComponent<LiftedGate>();
-
-        var a = Fallen(root, 1, Quaternion.Euler(0, 7, 90), new Vector3(gb.min.x - CerealH / 2 - 0.5f, 0, barrierZ + 0.6f));
-        Fallen(root, 2, Quaternion.Euler(0, -12, 14), new Vector3(xL + CerealW / 2 + 1.2f, 0, barrierZ - 0.4f));
-        Fallen(root, 3, Quaternion.Euler(0, -5, 90), new Vector3(gb.max.x + CerealH / 2 + 0.5f, 0, barrierZ + 0.4f));
-        Fallen(root, 4, Quaternion.Euler(0, 14, -15), new Vector3(xR - CerealW / 2 - 1.2f, 0, barrierZ - 0.6f));
-        var ab = GetBounds(a);
-        Fallen(root, 5, Quaternion.Euler(90, 22, 0), new Vector3(ab.center.x, ab.max.y + 0.6f, barrierZ + 0.3f));
-        SpillPieces(root, new Vector3(xc - 8f, 0, barrierZ - 4f), 5f, 50);
-
-        float sealD = 4f;
-        Seal(root, "Seal West", new Vector3((xL - 3f + gb.min.x) / 2, WallHeight / 2, barrierZ), new Vector3(gb.min.x - xL + 3f, WallHeight, sealD));
-        Seal(root, "Seal East", new Vector3((gb.max.x + xR + 3f) / 2, WallHeight / 2, barrierZ), new Vector3(xR + 3f - gb.max.x, WallHeight, sealD));
-        float liftedTop = gb.max.y + 6.5f;
-        Seal(root, "Seal Above", new Vector3(xc, (liftedTop + WallHeight) / 2, barrierZ), new Vector3(gb.size.x + 0.4f, WallHeight - liftedTop, sealD));
-
-        const float nearArm = 8f, farArm = 14f, plankW = 4f, thick = 0.3f;
-        var canPrefab = BeanCanBuilder.GetOrCreate();
-        var probe = Spawn(canPrefab, null, 0, 1);
-        var pb = GetBounds(probe);
-        Object.DestroyImmediate(probe);
-        float canScale = 0.13f * Scale / pb.size.y;
-        float canDiameter = Mathf.Max(pb.size.x, pb.size.z) * canScale;
-        float pivotY = canDiameter + thick / 2;
-        float rest = Mathf.Asin(pivotY / farArm) * Mathf.Rad2Deg;
-        float tipped = -Mathf.Asin(pivotY / nearArm) * Mathf.Rad2Deg;
-        float tipZ = gb.center.z;
-        float pivotZ = tipZ - farArm * Mathf.Cos(rest * Mathf.Deg2Rad);
-
-        var can = Spawn(canPrefab, root, 0, canScale);
-        can.name = "Pivot Can";
-        can.transform.rotation = Quaternion.Euler(0, 0, 90) * can.transform.rotation;
-        PlaceOnFloor(can, new Vector3(xc, 0, pivotZ));
-        AddBoxColliders(can);
-
-        var pivot = Plank(root, "Ruler", new Vector3(xc, pivotY, pivotZ), nearArm, farArm, plankW, thick,
-            GetMaterial("Ruler", new Color(0.86f, 0.72f, 0.38f)), ticks: true);
-        lifted.Setup(gb.min.y + 0.25f);
-        pivot.gameObject.AddComponent<Seesaw>().Setup(pivot, rest, tipped, farArm, thick, 0f, lifted);
-
-        float nearTipZ = pivotZ - nearArm * Mathf.Cos(rest * Mathf.Deg2Rad);
-        Matchbox(root, new Vector3(xc, 0, nearTipZ - 1.4f));
-
-        TutorialZoneAt(level, new Vector3(xc, 5, nearTipZ - 6f), new Vector3(w, 10, 16f), "balance", "TIP THE SCALES",
-            "Use the ruler to wedge open a gap to get through.", "SPACE");
     }
 
     static Transform Plank(Transform parent, string name, Vector3 pivotAt, float nearArm, float farArm, float width, float thick, Material mat, bool ticks)
@@ -391,131 +553,17 @@ static partial class GroceryStoreBuilder
             GetMaterial("Strike Strip", new Color(0.35f, 0.2f, 0.12f)));
         Box("Label", root, floorAt + new Vector3(0, size.y + 0.01f, 0), new Vector3(size.x * 0.8f, 0.02f, size.z * 0.7f),
             GetMaterial("Matchbox Label", new Color(0.95f, 0.85f, 0.2f)));
-        MakeText(root, floorAt + new Vector3(0, size.y / 2, -size.z / 2 - 0.02f), 0, "SAFETY MATCHES", size.x * 0.85f, size.y * 0.4f, Color.white);
+        MakeText(root, floorAt + new Vector3(0, size.y / 2, -size.z / 2 - 0.02f), 0, "SAFETY MATCHES", size.x * 0.85f, size.y * 0.4f, Color.white, lit: true);
     }
 
     static GameObject CarryBox(Transform parent, Vector3 at, float size = 1.5f)
     {
-        var closed = LoadKenney("cardboardBoxClosed");
-        if (closed == null) return null;
-        var step = SpawnSized(closed, parent, size, 20f);
+        var step = CardboardBox(parent, BoxKind.Sealed, size, 20f, at);
+        if (step == null) return null;
         step.name = "Carry Box";
-        step.isStatic = false;
-        PlaceOnFloor(step, at);
-        AddBoxColliders(step);
+        foreach (var t in step.GetComponentsInChildren<Transform>()) t.gameObject.isStatic = false;
         step.AddComponent<Carryable>();
         return step;
-    }
-
-    static void BuildStepPuzzle(Transform level, float xc, float w, float ledgeZ)
-    {
-        var root = new GameObject("Puzzle 2 - Step").transform;
-        root.SetParent(level);
-        const float ledgeH = 3f, ledgeD = 10f;
-
-        var closed = LoadKenney("cardboardBoxClosed");
-        if (closed != null)
-            for (int i = 0; i < 3; i++)
-            {
-                var slab = FitInto(closed, root, new Vector3(w / 3, ledgeH, ledgeD));
-                slab.name = "Ledge Box";
-                slab.position = new Vector3(xc - w / 2 + (i + 0.5f) * w / 3, slab.position.y, ledgeZ + ledgeD / 2);
-                AddBoxColliders(slab.gameObject);
-            }
-        Solid(root, "Ledge Collider", new Vector3(xc, ledgeH / 2, ledgeZ + ledgeD / 2), new Vector3(w + 2f, ledgeH, ledgeD));
-
-        CarryBox(root, new Vector3(xc + w * 0.25f, 0, ledgeZ - 14f));
-        devWarps.Add(("Puzzle 2", new Vector3(xc + w * 0.25f - 4f, 1, ledgeZ - 20f), 0));
-
-        TutorialZoneAt(level, new Vector3(xc, 5, ledgeZ - 9f), new Vector3(w, 10, 16f), "hand", "NEED A BOOST?",
-            "Carry the small box to the ledge to get over.", "E");
-    }
-
-    static void BuildRampPuzzle(Transform level, float xc, float w, float wallZ)
-    {
-        var root = new GameObject("Puzzle 3 - Ramp").transform;
-        root.SetParent(level);
-        float xL = xc - w / 2, xR = xc + w / 2;
-
-        float layerH = CerealD, boxLen = CerealH, wallD = CerealW;
-        int layers = 3;
-        float wallTop = layers * layerH;
-        for (int layer = 0; layer < layers; layer++)
-        {
-            float offset = layer % 2 == 0 ? 0 : boxLen / 2;
-            for (float x = xL - offset; x < xR - 0.5f; x += boxLen)
-            {
-                float a = Mathf.Max(x, xL), b = Mathf.Min(x + boxLen, xR);
-                if (b - a < 1f) continue;
-                float len = b - a - 0.08f;
-                var bx = CerealBox(root, 5);
-                bx.transform.localScale = new Vector3(1f, len / boxLen, 1f);
-                bx.transform.rotation = Quaternion.Euler(90, 90, 0) * Quaternion.Euler(0, (layer + (int)(x * 0.1f)) % 2 == 0 ? 0 : 180, 0);
-                PlaceOnFloor(bx, new Vector3((a + b) / 2, layer * layerH, wallZ + wallD / 2));
-            }
-        }
-        Solid(root, "Wall Collider", new Vector3(xc, wallTop / 2, wallZ + wallD / 2), new Vector3(w + 2f, wallTop, wallD));
-
-        const float rampLen = 15f, rampW = 6f;
-        float rampFarZ = wallZ - 0.6f;
-        var hinge = new GameObject("Ramp Hinge").transform;
-        hinge.SetParent(root);
-        hinge.position = new Vector3(xc, 0.3f, rampFarZ - rampLen);
-        var boardPrefab = LoadModel("k:cutting-board");
-        Transform board;
-        if (boardPrefab != null)
-        {
-            board = FitInto(boardPrefab, hinge, new Vector3(rampW, 0.6f, rampLen + 1.6f));
-            board.localPosition = new Vector3(0, 0, (rampLen + 1.6f) / 2);
-            AddBoxColliders(board.gameObject);
-        }
-        else
-        {
-            board = GameObject.CreatePrimitive(PrimitiveType.Cube).transform;
-            board.SetParent(hinge, false);
-            board.localScale = new Vector3(rampW, 0.6f, rampLen + 1.6f);
-            board.localPosition = new Vector3(0, 0, (rampLen + 1.6f) / 2);
-        }
-        foreach (var t in hinge.GetComponentsInChildren<Transform>()) t.gameObject.isStatic = false;
-        hinge.gameObject.AddComponent<Rigidbody>().isKinematic = true;
-        var ramp = hinge.gameObject.AddComponent<LiftedRamp>();
-        ramp.Setup(rampLen, wallTop - 0.3f, 0f);
-
-        const float nearArm = 4f, farArm = 7f, plankW = 3f, thick = 0.4f, pivotH = 1.6f;
-        float tipX = xc + 1f;
-        float pivotX = tipX - farArm;
-        float rest = Mathf.Asin((pivotH + thick / 2) / farArm) * Mathf.Rad2Deg;
-        float tippedTo = -Mathf.Asin((pivotH + thick / 2) / nearArm) * Mathf.Rad2Deg;
-        var jarPrefab = LoadModel("k:peanut-butter");
-        if (jarPrefab != null)
-        {
-            var jar = Spawn(jarPrefab, root, 0, 1);
-            var jb = GetBounds(jar);
-            jar.transform.localScale *= pivotH / Mathf.Max(jb.size.x, jb.size.z);
-            jar.transform.rotation = Quaternion.Euler(90, 0, 0) * jar.transform.rotation;
-            PlaceOnFloor(jar, new Vector3(pivotX, 0, rampFarZ));
-            AddBoxColliders(jar);
-        }
-        var pivot = Plank(root, "Spatula", new Vector3(pivotX, pivotH + thick / 2, rampFarZ), nearArm, farArm, plankW, thick,
-            GetMaterial("Spatula Wood", new Color(0.72f, 0.52f, 0.3f)), ticks: false);
-        pivot.gameObject.AddComponent<Seesaw>().Setup(pivot, rest, tippedTo, farArm, thick, 90f, ramp);
-        pivot.rotation = Quaternion.Euler(0, 90, 0) * Quaternion.Euler(rest, 0, 0);
-
-        CarryBox(root, new Vector3(xR - 5f, 0, rampFarZ - rampLen - 6f));
-        devWarps.Add(("Puzzle 3", new Vector3(xR - 9f, 1, rampFarZ - rampLen - 12f), 0));
-        SpillPieces(root, new Vector3(xc + 6f, 0, wallZ - 3f), 4f, 30);
-
-    }
-
-    static void TutorialZoneAt(Transform parent, Vector3 center, Vector3 size, string icon, string title, string body, params string[] keys)
-    {
-        var z = new GameObject($"Tutorial - {title}");
-        z.transform.SetParent(parent);
-        z.transform.position = center;
-        var box = z.AddComponent<BoxCollider>();
-        box.isTrigger = true;
-        box.size = size;
-        z.AddComponent<TutorialZone>().Setup(Glyph(icon), title, body, keys);
     }
 
     static Text skipHint;

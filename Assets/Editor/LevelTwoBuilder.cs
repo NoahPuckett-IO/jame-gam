@@ -19,36 +19,43 @@ static partial class GroceryStoreBuilder
         public float x, xW, xE;
         public float h1, h2, h3;
         public float boardDepth;
+        public float top, back;     // the shelf's top surface, and how far behind the edge its back panel is (level one only)
     }
 
-    static Hall levelTwoHall;
+    static Hall levelOneHall, levelTwoHall;
+
+    // keeps the shelf products off a board the route walks along (and leaves its cubby unsealed)
+    static void RouteBoard(Hall hall, bool westSide, float h, float zA, float zB)
+    {
+        float x0 = westSide ? hall.xW - hall.boardDepth - 1f : hall.xE - 1f;
+        float x1 = westSide ? hall.xW + 1f : hall.xE + hall.boardDepth + 1f;
+        var b = new Bounds();
+        b.SetMinMax(new Vector3(x0, h - 0.5f, Mathf.Min(zA, zB)), new Vector3(x1, h + 7f, Mathf.Max(zA, zB)));
+        NoStockZones.Add(b);
+    }
+
+    static Hall MakeHall(Transform eastAisle, float x)
+    {
+        var hall = new Hall { x = x, xW = x - WalkwayWidth / 2, xE = x + WalkwayWidth / 2, boardDepth = 7f };
+        var hs = BoardHeights(eastAisle, hall.xE + 3f, eastAisle.position.z);
+        hall.h1 = hs.Count > 0 ? hs[0] : 8.6f;
+        hall.h2 = hs.Count > 1 ? hs[1] : 17.3f;
+        hall.h3 = hs.Count > 2 ? hs[2] : 25.9f;
+        return hall;
+    }
 
     static void PlanLevelTwo(List<Transform> aisles, List<float> walkways, ShelfInfo shelf)
     {
         NoStockZones.Clear();
-        var east = aisles[0];
-        float x = walkways[1];
-        var hall = new Hall { x = x, xW = x - WalkwayWidth / 2, xE = x + WalkwayWidth / 2, boardDepth = 7f };
-        var hs = BoardHeights(east, hall.xE + 3f, east.position.z);
-        hall.h1 = hs.Count > 0 ? hs[0] : 8.6f;
-        hall.h2 = hs.Count > 1 ? hs[1] : 17.3f;
-        hall.h3 = hs.Count > 2 ? hs[2] : 25.9f;
+        var hall = MakeHall(aisles[0], walkways[1]);
         levelTwoHall = hall;
-
-        void Zone(bool westSide, float h, float zA, float zB)
-        {
-            float x0 = westSide ? hall.xW - hall.boardDepth - 1f : hall.xE - 1f;
-            float x1 = westSide ? hall.xW + 1f : hall.xE + hall.boardDepth + 1f;
-            var b = new Bounds();
-            b.SetMinMax(new Vector3(x0, h - 0.5f, Mathf.Min(zA, zB)), new Vector3(x1, h + 7f, Mathf.Max(zA, zB)));
-            NoStockZones.Add(b);
-        }
-        Zone(true, hall.h1, 66f, 112f);
-        Zone(true, hall.h2, 22f, 56f);
-        Zone(false, hall.h2, -16f, 30f);
-        Zone(false, hall.h3, -46f, -20f);
-        Zone(true, hall.h3, -66f, -52f);
-        Zone(false, hall.h1, -108f, -92f);
+        RouteBoard(hall, true, hall.h1, 66f, 112f);
+        RouteBoard(hall, true, hall.h2, 22f, 56f);
+        RouteBoard(hall, false, hall.h2, -16f, 30f);
+        RouteBoard(hall, false, hall.h3, -46f, -20f);
+        RouteBoard(hall, true, hall.h3, -66f, -52f);
+        RouteBoard(hall, false, hall.h1, -108f, -92f);
+        PlanLevelOne(aisles, walkways);
     }
 
     static void BuildLevelTwo(Transform store, float aisleLength)
@@ -70,14 +77,12 @@ static partial class GroceryStoreBuilder
         SodaSpill(root, hall.x, WalkwayWidth, zN - 17f, -zN + 6f, rng);
 
         float ladderZ = Mathf.Min(zN - 9f, 100f);
-        ToothpickLadder(root, new Vector3(hall.xW, 0, ladderZ), Vector3.right, hall.h1, new Vector3(hall.xW - 2.2f, hall.h1, ladderZ));
-        TutorialZoneAt(root, new Vector3(hall.xW + 3f, 4f, ladderZ), new Vector3(6f, 8f, 8f), "stairs", "CLIMB",
-            "Walk into the toothpick ladder (or press E) to grab it. W climbs, S goes down, Space lets go.", "W", "S", "E");
+        KitLadder(root, new Vector3(hall.xW, 0, ladderZ), Vector3.right, 0f, hall.h1, new Vector3(hall.xW - 2.2f, hall.h1, ladderZ));
         CheckpointAt(root, "Checkpoint L2-A", new Vector3(hall.xW - 3.5f, hall.h1, 95f), new Vector3(6, 4, 4), 180);
         RollingCan(root, new Vector3(hall.xW - 5.6f, hall.h1, 86f), new Vector3(4.4f, 0, 0), 1.3f, 0f);
         RollingCan(root, new Vector3(hall.xW - 5.6f, hall.h1, 77f), new Vector3(4.4f, 0, 0), 1.1f, 0.45f);
 
-        Ramp(root, new Vector3(hall.xW + 2.2f, hall.h1, 70f), new Vector3(hall.xW + 2.2f, hall.h2, 52f), 5.4f, true);
+        Ramp(root, hall, westSide: true, hall.h1, 70f, hall.h2, 52f);
         CheckpointAt(root, "Checkpoint L2-B", new Vector3(hall.xW - 3.5f, hall.h2, 50f), new Vector3(6, 4, 4), 180);
         RollingCan(root, new Vector3(hall.xW - 5.6f, hall.h2, 47.5f), new Vector3(4.4f, 0, 0), 1.0f, 0.2f);
         CarryBox(root, new Vector3(hall.xW - 3.5f, hall.h2, 42.5f));
@@ -276,26 +281,55 @@ static partial class GroceryStoreBuilder
         foreach (var b in root.GetComponentsInChildren<BoxCollider>()) b.enabled = true;
     }
 
-    static void Ramp(Transform parent, Vector3 low, Vector3 high, float width, bool propped)
+    // a plank from one shelf board up to the next, out in the walkway beside the shelf face. Each end gets a flat
+    // landing that reaches back over the board edge, propped on a stack of cereal boxes, so Henry walks board ->
+    // landing -> plank -> landing -> board with no gap, lip or floating end, and the planks are plain boxes so
+    // what you see is exactly what you stand on
+    static void Ramp(Transform parent, Hall hall, bool westSide, float lowY, float lowZ, float highY, float highZ)
     {
         var root = new GameObject("Ramp").transform;
         root.SetParent(parent);
-        var dir = high - low;
-        root.position = (low + high) / 2;
-        root.rotation = Quaternion.LookRotation(dir);
-        var board = LoadModel("k:cutting-board");
-        if (board != null)
+        const float width = 5.4f, landingLen = 6f, thick = 0.4f, overlap = 1.2f;
+        int out_ = westSide ? 1 : -1;          // from the shelf face out into the walkway
+        float face = westSide ? hall.xW : hall.xE;
+        float cx = face + out_ * (width / 2 + 0.3f);
+        var wood = PlankMaterial();
+        int along = highZ > lowZ ? 1 : -1;
+
+        void Landing(float y, float zEnd, int awayFromRamp)
         {
-            var b = FitInto(board, root, new Vector3(width, 0.5f, dir.magnitude + 1f));
-            b.localPosition = Vector3.down * 0.25f;
-            b.localRotation = Quaternion.identity;
+            float z0 = zEnd, z1 = zEnd + awayFromRamp * landingLen;
+            float xa = face - out_ * overlap, xb = face + out_ * (width + 0.3f);
+            var center = new Vector3((xa + xb) / 2, y - thick / 2 + 0.04f, (z0 + z1) / 2);
+            var size = new Vector3(Mathf.Abs(xb - xa), thick, landingLen);
+            var go = Box2("Landing", root, center, size, wood);
+            go.isStatic = true;
+            Pillar(root, new Vector3(cx, 0, (z0 + z1) / 2), y - thick + 0.04f, lyingAlongZ: true);
         }
-        Solid(root, "Ramp Collider", root.position + root.up * -0.25f, Vector3.one);
-        var col = root.GetChild(root.childCount - 1).GetComponent<BoxCollider>();
-        col.transform.localPosition = Vector3.down * 0.25f;
-        col.transform.localRotation = Quaternion.identity;
-        col.size = new Vector3(width, 0.5f, dir.magnitude + 1f);
-        if (propped) Pillar(parent, new Vector3(high.x, 0, high.z - 1.5f), high.y - 0.6f, lyingAlongZ: true);
+        Landing(lowY, lowZ, -along);
+        Landing(highY, highZ, along);
+
+        var a = new Vector3(cx, lowY + 0.04f, lowZ);
+        var b = new Vector3(cx, highY + 0.04f, highZ);
+        var dir = b - a;
+        var plank = Box2("Ramp Plank", root, (a + b) / 2, new Vector3(width, thick, dir.magnitude), wood);
+        plank.transform.rotation = Quaternion.LookRotation(dir);
+        plank.transform.position = (a + b) / 2 - plank.transform.up * thick / 2;
+        // cleats across the plank: grip for a tiny climber, and they read as a ramp from a distance
+        for (float t = 0.12f; t < 0.95f; t += 0.16f)
+        {
+            var cleat = Box2("Cleat", plank.transform.parent, Vector3.Lerp(a, b, t) + plank.transform.up * 0.06f,
+                new Vector3(width * 0.92f, 0.12f, 0.35f), PlankMaterial(dark: true));
+            cleat.transform.rotation = plank.transform.rotation;
+            Object.DestroyImmediate(cleat.GetComponent<Collider>());
+        }
+    }
+
+    static Material PlankMaterial(bool dark = false)
+    {
+        var mat = GetMaterial(dark ? "Plank Wood Dark" : "Plank Wood", dark ? new Color(0.55f, 0.36f, 0.2f) : new Color(0.78f, 0.58f, 0.36f));
+        mat.SetFloat("_Smoothness", 0.2f);
+        return mat;
     }
 
     static void Mop(Transform parent, Vector3 a, Vector3 b)
@@ -429,8 +463,8 @@ static partial class GroceryStoreBuilder
             panel.transform.localScale = new Vector3(w, h, 0.15f);
             panel.GetComponent<Renderer>().sharedMaterial = yellow;
             float textYaw = yaw + (s < 0 ? 0 : 180);
-            MakeText(root, root.TransformPoint(new Vector3(0, h * 0.55f, s * (h * 0.12f + 0.25f))), textYaw, "CAUTION\nWET FLOOR", w * 0.8f, h * 0.3f, Color.black);
-            MakeIcon(root, root.TransformPoint(new Vector3(0, h * 0.25f, s * (h * 0.12f + 0.2f))), textYaw, "walk", w * 0.45f, Color.black);
+            MakeText(root, root.TransformPoint(new Vector3(0, h * 0.55f, s * (h * 0.12f + 0.25f))), textYaw, "CAUTION\nWET FLOOR", w * 0.8f, h * 0.3f, Color.black, lit: true);
+            MakeIcon(root, root.TransformPoint(new Vector3(0, h * 0.25f, s * (h * 0.12f + 0.2f))), textYaw, "walk", w * 0.45f, Color.black, lit: true);
         }
     }
 }

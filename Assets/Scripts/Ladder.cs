@@ -10,12 +10,14 @@ public class Ladder : PlayerRide
     [SerializeField] float firstRung = 0.42f;
     [SerializeField] float halfWidth = 0.5f;
     [SerializeField] Vector3 stepOff;       // where the climber's feet land on the ledge
+    [SerializeField] bool fromTop;          // can also be climbed down from the ledge
 
     const float StandOff = 0.42f, ClimbSpeed = 3.4f;
     float height;                           // how far the climber's feet are above the floor
     float mountT, exitT = -1f;
     Vector3 mountFrom, exitFrom;
     float lastRung;
+    bool descendHeld;
 
     // the climber's right while facing the ladder (they face -outward)
     Vector3 Right => Vector3.Cross(outward, Vector3.up).normalized;
@@ -37,6 +39,7 @@ public class Ladder : PlayerRide
             return;
         }
         if (!CanBoard || !player.IsGrounded) return;
+        if (fromTop && TryMountFromTop()) return;
 
         var p = player.transform.position;
         var rel = p - (foot + outward * StandOff);
@@ -50,10 +53,39 @@ public class Ladder : PlayerRide
         if (!pushing && !InteractPressed) return;
 
         height = Mathf.Max(0f, feet);
+        descendHeld = false;
         mountFrom = p;
         mountT = 0f;
         exitT = -1f;
         Board("Climb");
+    }
+
+    // standing on the ledge at the top: walk to the edge over the ladder (or press E) to swing on and climb down
+    bool TryMountFromTop()
+    {
+        var p = player.transform.position;
+        float feet = p.y - 1f;
+        if (Mathf.Abs(feet - top) > 0.4f) return false;
+        var fromLanding = p - stepOff;
+        fromLanding.y = 0f;
+        var toLadder = foot - stepOff;
+        toLadder.y = 0f;
+        float along = Vector3.Dot(p - foot, Right);
+        if (fromLanding.magnitude > 2.4f || Mathf.Abs(along) > halfWidth + 0.6f) return false;
+
+        var input = player.MoveInput;
+        var wish = Quaternion.Euler(0f, player.Yaw, 0f) * new Vector3(input.x, 0f, input.y);
+        bool pushing = wish.sqrMagnitude > 0.25f && Vector3.Dot(wish.normalized, toLadder.normalized) > 0.6f
+                       && Vector3.Dot(fromLanding, toLadder.normalized) > 0.3f;
+        if (!pushing && !InteractPressed) return false;
+
+        height = top - foot.y - 1.25f;
+        descendHeld = pushing;
+        mountFrom = p;
+        mountT = 0f;
+        exitT = -1f;
+        Board("Climb");
+        return true;
     }
 
     void Climb()
@@ -74,6 +106,8 @@ public class Ladder : PlayerRide
         }
 
         float v = player.MoveInput.y;
+        // swung on from the top while walking at it: keep walking that way to climb down, until the stick is let go
+        if (descendHeld) { if (v > 0.2f) v = -v; else descendHeld = false; }
         if (Mathf.Abs(v) > 0.2f) height += Mathf.Sign(v) * ClimbSpeed * Time.deltaTime;
 
         if (height <= 0f && v < -0.2f) { Leave(outward * 2f); return; }
@@ -137,8 +171,9 @@ public class Ladder : PlayerRide
         limbs.Set(AvatarIKGoal.RightFoot, rf, body + Vector3.down * 0.3f + r * 0.2f - outward * 0.6f);
     }
 
-    public void Setup(Vector3 bottom, Vector3 facing, float ledge, float spacing, float first, float width, Vector3 landing)
+    public void Setup(Vector3 bottom, Vector3 facing, float ledge, float spacing, float first, float width, Vector3 landing, bool down = false)
     {
+        fromTop = down;
         foot = bottom;
         outward = new Vector3(facing.x, 0f, facing.z).normalized;
         top = ledge;

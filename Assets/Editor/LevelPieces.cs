@@ -5,6 +5,80 @@ using UnityEngine;
 
 static partial class GroceryStoreBuilder
 {
+    const string PlatformerFolder = "Assets/ThirdParty/KenneyPlatformer";
+
+    // a real wooden ladder (Kenney platformer kit) stood against a shelf face, its rails stretched to reach from
+    // bottomY to a little above the ledge at topY. bottomY above the floor makes a ladder that hangs from the
+    // board, out of reach until Henry stands on something. Falls back to the toothpick ladder if the model's missing.
+    static Transform KitLadder(Transform parent, Vector3 faceAt, Vector3 outward, float bottomY, float topY, Vector3 landing, bool down = false)
+    {
+        string path = $"{PlatformerFolder}/ladder-long.fbx";
+        var prefab = Usable(AssetDatabase.LoadAssetAtPath<GameObject>(path), path);
+        if (prefab == null)
+        {
+            ToothpickLadder(parent, faceAt, outward, topY, landing);
+            return null;
+        }
+        var root = new GameObject("Ladder").transform;
+        root.SetParent(parent);
+        outward = new Vector3(outward.x, 0, outward.z).normalized;
+        var plane = new Vector3(faceAt.x, bottomY, faceAt.z) + outward * 0.18f;
+
+        // rung heights, as fractions of the model's height, from the vertices near the middle (only rungs are there)
+        var mf = prefab.GetComponentInChildren<MeshFilter>();
+        var mesh = mf.sharedMesh;
+        var mb = mesh.bounds;
+        var ys = mesh.isReadable
+            ? mesh.vertices.Where(v => Mathf.Abs(v.x - mb.center.x) < mb.size.x * 0.15f).Select(v => (v.y - mb.min.y) / mb.size.y).OrderBy(y => y).ToList()
+            : new List<float>();
+        var rungs = new List<float>();
+        foreach (var y in ys)
+            if (rungs.Count == 0 || y - rungs[rungs.Count - 1] > 0.04f) rungs.Add(y); else rungs[rungs.Count - 1] = (rungs[rungs.Count - 1] + y) / 2;
+        float firstFrac = rungs.Count > 1 ? rungs[0] : 0.1f;
+        float stepFrac = rungs.Count > 1 ? (rungs[rungs.Count - 1] - rungs[0]) / (rungs.Count - 1) : 0.1f;
+
+        var probe = Spawn(prefab, null, 0, 1);
+        var pb = GetBounds(probe);
+        Object.DestroyImmediate(probe);
+        float wide = 1.2f, s = wide / Mathf.Max(pb.size.x, 0.01f);
+        float total = topY + 1.3f - bottomY;
+        int n = Mathf.Max(1, Mathf.RoundToInt(total / (pb.size.y * s)));
+        float segH = total / n;
+        for (int i = 0; i < n; i++)
+        {
+            var seg = Spawn(prefab, root, 0, 1);
+            seg.name = "Ladder Section";
+            seg.transform.rotation = Quaternion.LookRotation(outward) * prefab.transform.rotation;
+            var ls = seg.transform.localScale;
+            seg.transform.localScale = new Vector3(ls.x * s, ls.y * segH / pb.size.y, ls.z * s);
+            var b = GetBounds(seg);
+            seg.transform.position += plane + Vector3.up * (i * segH) - new Vector3(b.center.x, b.min.y, b.center.z);
+        }
+        if (bottomY > 0.5f)
+        {
+            // hooks over the edge it hangs from, reaching back over the ledge it leads to
+            var iron = GetMaterial("Ladder Hook", new Color(0.18f, 0.18f, 0.2f));
+            var across = Vector3.Cross(Vector3.up, outward);
+            var toLedge = new Vector3(landing.x - plane.x, 0, landing.z - plane.z).normalized;
+            foreach (int side in new[] { -1, 1 })
+            {
+                var hook = Box2("Hook", root, new Vector3(plane.x, topY + 0.15f, plane.z) + across * side * 0.5f + toLedge * 0.35f,
+                    new Vector3(0.16f, 0.3f, 0.16f), iron);
+                hook.transform.rotation = Quaternion.LookRotation(toLedge);
+                hook.transform.localScale = new Vector3(0.16f, 0.12f, 0.9f);
+                Object.DestroyImmediate(hook.GetComponent<Collider>());
+            }
+        }
+        root.gameObject.AddComponent<Ladder>().Setup(plane, outward, topY, segH * stepFrac, segH * firstFrac, 0.55f, landing, down);
+        return root;
+    }
+
+    static GameObject Box2(string name, Transform parent, Vector3 pos, Vector3 size, Material mat)
+    {
+        Box(name, parent, pos, size, mat);
+        return parent.GetChild(parent.childCount - 1).gameObject;
+    }
+
     static void Seal(Transform parent, string name, Vector3 center, Vector3 size)
     {
         Solid(parent, name, center, size);
@@ -22,9 +96,10 @@ static partial class GroceryStoreBuilder
         }
     }
 
-    // invisible walls in front of every shelf face so Henry can't wander into the cubbies; built after
-    // SettleProps so stocked products don't get shoved out. The freezer hall is skipped (solid freezers), and
-    // the shelf-climb hall only gets sealed outside the boards its route uses.
+    // invisible walls in every shelf cubby Henry isn't meant to walk into, flush with the front edge of the boards
+    // so there's no lip to stand on; built after SettleProps so stocked products don't get shoved out. The freezer
+    // hall is skipped (solid freezers); the two climbing halls (levels one and two) leave open just the boards
+    // their routes use, from the NoStockZones.
     static void SealShelves(Transform store, List<float> walkways, ShelfInfo shelf, float aisleLength)
     {
         var root = new GameObject("Shelf Seals").transform;
@@ -32,41 +107,42 @@ static partial class GroceryStoreBuilder
         float half = WalkwayWidth / 2, depth = shelf.SideDepth * 0.95f, top = ShelfHeight - 0.4f;
         float zS = -aisleLength / 2, zN = aisleLength / 2;
 
-        void Face(float face, int dir, float y0, float y1, float z0, float z1, float inset)
+        void Face(float face, int dir, float y0, float y1, float z0, float z1)
         {
             if (y1 - y0 < 0.2f || z1 - z0 < 0.5f) return;
-            float x0 = face + dir * inset, x1 = face + dir * depth;
+            float x0 = face - dir * 0.05f, x1 = face + dir * depth;
             Seal(root, "Shelf Seal", new Vector3((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2),
                 new Vector3(Mathf.Abs(x1 - x0), y1 - y0, z1 - z0));
         }
 
-        var hall = levelTwoHall;
         for (int w = 0; w < walkways.Count; w++)
         {
             if (w == 2) continue;
             var faces = new List<(float face, int dir)> { (walkways[w] + half, 1) };
             if (w < walkways.Count - 1) faces.Add((walkways[w] - half, -1));
+            bool route = w == 0 || w == 1;
+            var hall = w == 0 ? levelOneHall : levelTwoHall;
             foreach (var (face, dir) in faces)
             {
-                if (w != 1)
+                if (!route)
                 {
-                    Face(face, dir, 0f, top, zS, zN, 0f);
+                    Face(face, dir, 0f, top, zS, zN);
                     continue;
                 }
-                Face(face, dir, 0f, hall.h1 - 0.15f, zS, zN, 0f);
+                Face(face, dir, 0f, hall.h1 - 0.15f, zS, zN);
                 var bands = new[] { (hall.h1, hall.h2), (hall.h2, hall.h3), (hall.h3, top) };
                 foreach (var (h, next) in bands)
                 {
                     var open = NoStockZones
-                        .Where(b => Mathf.Abs(b.min.y - (h - 0.5f)) < 0.1f && (b.center.x > hall.x) == (dir > 0))
-                        .Select(b => (b.min.z - 6f, b.max.z + 6f)).OrderBy(r => r.Item1).ToList();
+                        .Where(b => Mathf.Abs(b.min.y - (h - 0.5f)) < 0.1f && Mathf.Abs(b.center.x - (face + dir * hall.boardDepth / 2)) < hall.boardDepth)
+                        .Select(b => (b.min.z - 4f, b.max.z + 4f)).OrderBy(r => r.Item1).ToList();
                     float from = zS;
                     foreach (var (a, b) in open)
                     {
-                        Face(face, dir, h + 0.05f, next - 0.15f, from, Mathf.Min(a, zN), 0.8f);
+                        Face(face, dir, h + 0.05f, next - 0.15f, from, Mathf.Min(a, zN));
                         from = Mathf.Max(from, b);
                     }
-                    Face(face, dir, h + 0.05f, next - 0.15f, from, zN, 0.8f);
+                    Face(face, dir, h + 0.05f, next - 0.15f, from, zN);
                 }
             }
         }

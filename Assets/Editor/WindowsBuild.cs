@@ -6,9 +6,15 @@ using UnityEngine;
 static class WindowsBuild
 {
     [MenuItem("JameGam/Build Windows Game %#&w")]
-    static void Build()
+    static void Build() => Build("TinyHenryBuild");
+
+    // a build to try out before release, kept apart from the folder that gets uploaded to itch
+    [MenuItem("JameGam/Build Windows Preview")]
+    static void BuildPreview() => Build("TinyHenryPreview");
+
+    static void Build(string folderName)
     {
-        string folder = Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.DesktopDirectory), "TinyHenryBuild");
+        string folder = Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.DesktopDirectory), folderName);
         if (Directory.Exists(folder)) Directory.Delete(folder, true);
         var options = new BuildPlayerOptions
         {

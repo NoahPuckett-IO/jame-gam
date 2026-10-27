@@ -48,9 +48,10 @@ static class MenuBuilder
         sh.effectColor = new Color(0, 0, 0, 0.75f);
         sh.effectDistance = new Vector2(6, -8);
 
-        var play = MakeButton(root, "Play Button", "PLAY", GroceryStoreBuilderGlyph("play"), new Vector2(140, 410), primary: true);
-        var settings = MakeButton(root, "Settings Button", "SETTINGS", GroceryStoreBuilderGlyph("settings"), new Vector2(140, 305), primary: false);
-        var quit = MakeButton(root, "Quit Button", "QUIT", GroceryStoreBuilderGlyph("close"), new Vector2(140, 200), primary: false);
+        var play = MakeButton(root, "Play Button", "PLAY", GroceryStoreBuilderGlyph("play"), new Vector2(140, 455), primary: true);
+        var tutorial = MakeButton(root, "Tutorial Button", "TUTORIAL", GroceryStoreBuilderGlyph("school"), new Vector2(140, 350), primary: false);
+        var settings = MakeButton(root, "Settings Button", "SETTINGS", GroceryStoreBuilderGlyph("settings"), new Vector2(140, 245), primary: false);
+        var quit = MakeButton(root, "Quit Button", "QUIT", GroceryStoreBuilderGlyph("close"), new Vector2(140, 140), primary: false);
 
 
         var frame = Rect("Character Frame", root, new Vector2(1, 0.5f), new Vector2(1, 0.5f));
@@ -85,6 +86,7 @@ static class MenuBuilder
         play.GetComponent<MenuButtonFx>().Setup(MenuButtonFx.Sound.Confirm);
         quit.GetComponent<MenuButtonFx>().Setup(MenuButtonFx.Sound.Back);
         UnityEventTools.AddPersistentListener(play.onClick, menu.Play);
+        UnityEventTools.AddPersistentListener(tutorial.onClick, menu.Tutorial);
         UnityEventTools.AddPersistentListener(settings.onClick, menu.OpenSettings);
         UnityEventTools.AddPersistentListener(quit.onClick, menu.Quit);
         events.GetComponent<EventSystem>().firstSelectedGameObject = play.gameObject;

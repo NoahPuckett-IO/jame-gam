@@ -118,7 +118,8 @@ static partial class GroceryStoreBuilder
         {
             float ax = aisles[i].position.x, g = shelf.gondolaDepth;
             float x0 = i == 1 ? ax : ax - g / 2, x1 = i == 2 ? ax : ax + g / 2;
-            Seal(bounds, $"Above Aisle {i + 1}", new Vector3((x0 + x1) / 2, topY, 0), new Vector3(x1 - x0, topH, aisleLength));
+            if (i == 0) SealAboveLevelOne(bounds, $"Above Aisle {i + 1}", x0, x1, topY, topH, aisleLength);
+            else Seal(bounds, $"Above Aisle {i + 1}", new Vector3((x0 + x1) / 2, topY, 0), new Vector3(x1 - x0, topH, aisleLength));
         }
         Seal(bounds, "Above Wall Shelf", new Vector3(wallShelf.position.x, topY, 0), new Vector3(shelf.gondolaDepth, topH, aisleLength));
 
@@ -194,9 +195,13 @@ static partial class GroceryStoreBuilder
         }
 
         SettleProps();
+        foreach (var s in lateSeals) if (s != null) s.SetActive(true);
+        lateSeals.Clear();
         SealShelves(store.transform, walkways, shelf, aisleLength);
         AddGrime(store.transform, left, right, depth);
         MakeProductsMatte(store.transform);
+        BuildTutorialRoom(store.transform);
+        AddPickupOutlines(store.transform);
 
         MenuBuilder.Build(controller, spawn);
         BuildMusic();
@@ -280,6 +285,8 @@ static partial class GroceryStoreBuilder
         {
             r.sharedMaterials = Enumerable.Repeat(mat, r.sharedMaterials.Length).ToArray();
             r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+            // he still casts a shadow, but shelves and boxes no longer darken him
+            r.receiveShadows = false;
             if (r is SkinnedMeshRenderer smr) smr.updateWhenOffscreen = true;
         }
         var b = GetBounds(model);
@@ -298,16 +305,16 @@ static partial class GroceryStoreBuilder
         fill.transform.localPosition = new Vector3(0.8f, 3f, -2.5f);
         fill.type = LightType.Point;
         fill.color = new Color(1f, 0.95f, 0.88f);
-        fill.range = 9f;
-        fill.intensity = 9f;
+        fill.range = 10f;
+        fill.intensity = 11f;
         fill.shadows = LightShadows.None;
         var key = new GameObject("Henry Key Light").AddComponent<Light>();
         key.transform.SetParent(player.transform, false);
         key.transform.localPosition = new Vector3(-0.6f, 2.6f, 2.4f);
         key.type = LightType.Point;
         key.color = new Color(0.85f, 0.9f, 1f);
-        key.range = 6f;
-        key.intensity = 5f;
+        key.range = 7f;
+        key.intensity = 7f;
         key.shadows = LightShadows.None;
 
         player.AddComponent<PlayerAnimator>().Setup(animator);
@@ -798,8 +805,10 @@ static partial class GroceryStoreBuilder
                     float boardDepth = Mathf.Abs(back - front);
                     if (boardDepth < 0.05f * Scale) continue;
 
-                    Box("Price Rail", products, new Vector3(front + side * 0.004f * Scale, y - 0.015f * Scale, zc),
+                    var rail = Box2("Price Rail", products, new Vector3(front + side * 0.004f * Scale, y - 0.015f * Scale, zc),
                         new Vector3(0.008f * Scale, 0.035f * Scale, shelf.length * 0.98f), railMat);
+                    // decoration only: a collider here is a thin lip that snags Henry on ramps and shelf edges
+                    Object.DestroyImmediate(rail.GetComponent<Collider>());
 
                     StockBoard(products, types, rng, Rand, side, y, room, front, boardDepth, start, shelf.length, gap, upTris, tagMat);
                 }
@@ -870,10 +879,7 @@ static partial class GroceryStoreBuilder
 
     static void PlaceBoxes(Transform store, List<Transform> aisles, ShelfInfo shelf, float aisleLength)
     {
-        var closed = LoadKenney("cardboardBoxClosed");
-        var open = LoadKenney("cardboardBoxOpen");
-        if (closed == null || open == null) return;
-
+        if (BoxPrefab(BoxKind.Sealed) == null) return;
         var root = new GameObject("Boxes").transform;
         root.SetParent(store);
         float boxSize = 0.45f * Scale;
@@ -891,19 +897,26 @@ static partial class GroceryStoreBuilder
                 float z = -aisleLength / 2 + (u + 0.5f) * shelf.length;
                 var tops = SurfacesAt(upTris, x, z);
                 float top = tops.Count > 0 ? tops[tops.Count - 1] : ShelfHeight;
-                var box = SpawnSized(rng.NextDouble() < 0.7 ? closed : open, root, boxSize, rng.Next(-10, 10));
-                PlaceOnFloor(box, new Vector3(x, top, z));
-                AddBoxColliders(box);
+                double roll = rng.NextDouble();
+                var kind = roll < 0.6 ? BoxKind.Sealed : roll < 0.75 ? BoxKind.SealedLong : roll < 0.9 ? BoxKind.Ajar : BoxKind.Open;
+                var box = CardboardBox(root, kind, boxSize, rng.Next(-10, 10), new Vector3(x, top, z));
+                // sealed boxes sometimes have a second one stacked on them
+                GameObject second = null;
+                if (kind == BoxKind.Sealed && rng.NextDouble() < 0.3)
+                    second = CardboardBox(root, rng.NextDouble() < 0.5 ? BoxKind.Ajar : BoxKind.Sealed, boxSize * 0.8f, rng.Next(-20, 20),
+                        new Vector3(x, GetBounds(box).max.y, z));
+                // level one walks along this stretch of the first gondola's top (made and dropped, so the rest keep their rolls)
+                if (Mathf.Abs(x - (levelOneHall.xW - shelf.gondolaDepth / 2)) < 1f && z > L1TopFrom - 6f && z < L1TopTo + 6f)
+                {
+                    Object.DestroyImmediate(box);
+                    if (second != null) Object.DestroyImmediate(second);
+                }
             }
         }
     }
 
     static void BuildBlockades(Transform store, List<Transform> aisles, ShelfInfo shelf, float aisleLength, float depth)
     {
-        var closed = LoadKenney("cardboardBoxClosed");
-        var open = LoadKenney("cardboardBoxOpen");
-        if (closed == null || open == null) return;
-
         var root = new GameObject("Blockades").transform;
         root.SetParent(store);
         var rng = new System.Random(11);
@@ -1018,7 +1031,7 @@ static partial class GroceryStoreBuilder
 
     static void MakeModelsReadable()
     {
-        foreach (var folder in new[] { ModelFolder, KenneyFolder, FoodKitFolder })
+        foreach (var folder in new[] { ModelFolder, KenneyFolder, FoodKitFolder, SurvivalFolder, PlatformerFolder })
         foreach (var guid in AssetDatabase.FindAssets("t:Model", new[] { folder }))
         {
             var importer = AssetImporter.GetAtPath(AssetDatabase.GUIDToAssetPath(guid)) as ModelImporter;

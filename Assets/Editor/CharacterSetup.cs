@@ -79,7 +79,8 @@ static class CharacterSetup
         mat.SetFloat("_Smoothness", 0.18f);
         mat.EnableKeyword("_EMISSION");
         mat.SetTexture("_EmissionMap", skin);
-        mat.SetColor("_EmissionColor", new Color(0.22f, 0.22f, 0.22f));
+        // a good share of his own colours as glow, so shadows and dim corners never turn him into a silhouette
+        mat.SetColor("_EmissionColor", new Color(0.42f, 0.42f, 0.42f));
         EditorUtility.SetDirty(mat);
         return mat;
     }

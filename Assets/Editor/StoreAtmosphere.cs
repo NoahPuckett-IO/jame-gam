@@ -99,8 +99,8 @@ static class StoreAtmosphere
     {
         RenderSettings.ambientMode = AmbientMode.Trilight;
         RenderSettings.ambientSkyColor = new Color(0.3f, 0.32f, 0.33f);
-        RenderSettings.ambientEquatorColor = new Color(0.22f, 0.23f, 0.24f);
-        RenderSettings.ambientGroundColor = new Color(0.1f, 0.1f, 0.1f);
+        RenderSettings.ambientEquatorColor = new Color(0.25f, 0.26f, 0.27f);
+        RenderSettings.ambientGroundColor = new Color(0.17f, 0.17f, 0.17f);
 
         RenderSettings.fog = true;
         RenderSettings.fogMode = FogMode.ExponentialSquared;

@@ -73,7 +73,6 @@ public class PlayerController : MonoBehaviour
         yaw = rotation.eulerAngles.y;
         verticalVelocity = 0f;
         planarVelocity = knockback = Vector3.zero;
-        iceZones = 0;
         platform = null;
         Attached = false;
     }
@@ -215,7 +214,7 @@ public class PlayerController : MonoBehaviour
 
         verticalVelocity += gravity * Time.deltaTime;
 
-        float t = InCutscene ? 30f : (iceZones > 0 ? IceTraction : traction);
+        float t = InCutscene ? 30f : (OnIce ? IceTraction : traction);
         if (!InCutscene && Time.time < dashUntil)
         {
             planarVelocity = dashDir.normalized * dashSpeed;
@@ -275,11 +274,8 @@ public class PlayerController : MonoBehaviour
     const float IceTraction = 1.6f;
     const float AirControl = 2.5f;
     Vector3 planarVelocity, knockback;
-    int iceZones;
 
-    public bool OnIce => iceZones > 0;
-    public void EnterIce() => iceZones++;
-    public void ExitIce() => iceZones = Mathf.Max(0, iceZones - 1);
+    public bool OnIce => IceZone.Contains(transform.position + Vector3.down * 0.5f);
 
     public void Launch(float upSpeed)
     {

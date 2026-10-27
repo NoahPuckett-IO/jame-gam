@@ -1,31 +1,89 @@
 using System.Collections.Generic;
+using UnityEditor;
 using UnityEngine;
 
 static partial class GroceryStoreBuilder
 {
+    const string SurvivalFolder = "Assets/ThirdParty/KenneySurvival";
+
+    // the cardboard boxes, all in one colour: Sealed (taped shut), Ajar (flaps up a little), Open (flaps folded out)
+    enum BoxKind { Sealed, SealedLong, Ajar, Open, OpenWide }
+
+    static GameObject BoxPrefab(BoxKind kind)
+    {
+        string path = kind switch
+        {
+            BoxKind.Sealed => $"{SurvivalFolder}/box.fbx",
+            BoxKind.SealedLong => $"{SurvivalFolder}/box-large.fbx",
+            BoxKind.Open => $"{SurvivalFolder}/box-open.fbx",
+            BoxKind.Ajar => $"{KenneyFolder}/cardboardBoxClosed.fbx",
+            _ => $"{KenneyFolder}/cardboardBoxOpen.fbx",
+        };
+        var prefab = Usable(AssetDatabase.LoadAssetAtPath<GameObject>(path), path);
+        if (prefab == null && kind != BoxKind.Ajar && kind != BoxKind.OpenWide)
+            return BoxPrefab(kind == BoxKind.Open ? BoxKind.OpenWide : BoxKind.Ajar);
+        return prefab;
+    }
+
+    // the furniture-kit boxes are flat colours; tint them to match the taped survival-kit boxes
+    static void Recolor(GameObject box, BoxKind kind)
+    {
+        if (kind != BoxKind.Ajar && kind != BoxKind.OpenWide) return;
+        var light = GetMaterial("Cardboard Box", new Color(0.93f, 0.6f, 0.43f));
+        var dark = GetMaterial("Cardboard Box Inside", new Color(0.62f, 0.38f, 0.26f));
+        foreach (var r in box.GetComponentsInChildren<Renderer>())
+        {
+            var mats = r.sharedMaterials;
+            for (int i = 0; i < mats.Length; i++)
+                mats[i] = mats[i] != null && mats[i].name.Contains("Dark") ? dark : light;
+            r.sharedMaterials = mats;
+        }
+    }
+
+    // a box whose largest side is `size`, with a box collider, sitting with its bottom at `floorAt`
+    static GameObject CardboardBox(Transform parent, BoxKind kind, float size, float yaw, Vector3 floorAt, bool collider = true)
+    {
+        var prefab = BoxPrefab(kind);
+        if (prefab == null) return null;
+        var go = SpawnSized(prefab, parent, size, yaw);
+        go.name = kind.ToString() + " Box";
+        Recolor(go, kind);
+        PlaceOnFloor(go, floorAt);
+        if (collider) AddBoxColliders(go);
+        return go;
+    }
+
+    // a barricade of boxes: a tight bottom layer of sealed boxes (no gaps to see through), a second sealed layer
+    // over most of it, then a few ajar or open boxes on top, all dropped with physics so nothing floats
     static void BoxPile(Transform parent, float x0, float x1, float z0, float z1, System.Random rng, List<ProductType> goods)
     {
-        var closed = LoadKenney("cardboardBoxClosed");
-        var open = LoadKenney("cardboardBoxOpen");
-        if (closed == null || open == null) return;
+        if (BoxPrefab(BoxKind.Sealed) == null) return;
         float R(float a, float b) => a + (float)rng.NextDouble() * (b - a);
         float box = 0.45f * Scale;
         int nx = Mathf.Max(1, Mathf.RoundToInt((x1 - x0) / box)), nz = Mathf.Max(1, Mathf.RoundToInt((z1 - z0) / box));
+        float cx = (x1 - x0) / nx, cz = (z1 - z0) / nz, cell = Mathf.Min(cx, cz);
         var heights = new float[nx, nz];
-        Vector3 Cell(int i, int j) => new Vector3(x0 + (i + 0.5f) * (x1 - x0) / nx, 0, z0 + (j + 0.5f) * (z1 - z0) / nz);
+        Vector3 Cell(int i, int j) => new Vector3(x0 + (i + 0.5f) * cx, 0, z0 + (j + 0.5f) * cz);
 
         for (int i = 0; i < nx; i++)
         for (int j = 0; j < nz; j++)
         {
-            var b = SpawnSized(closed, parent, box * R(0.85f, 1.02f), R(0f, 360f));
-            PlaceOnFloor(b, Cell(i, j) + new Vector3(R(-0.1f, 0.1f) * box, 0, R(-0.1f, 0.1f) * box));
-            AddBoxColliders(b);
+            var b = CardboardBox(parent, BoxKind.Sealed, cell * 0.99f, R(-2f, 2f), Cell(i, j));
+            heights[i, j] = GetBounds(b).max.y;
+        }
+
+        for (int i = 0; i < nx; i++)
+        for (int j = 0; j < nz; j++)
+        {
+            if (rng.NextDouble() < 0.3) continue;
+            var b = CardboardBox(parent, BoxKind.Sealed, cell * R(0.8f, 0.95f), R(-12f, 12f),
+                Cell(i, j) + new Vector3(R(-0.06f, 0.06f) * cell, heights[i, j] + 0.05f, R(-0.06f, 0.06f) * cell));
             SettleLater(b, force: true);
             heights[i, j] = GetBounds(b).max.y;
         }
 
-        int loose = Mathf.RoundToInt(nx * nz * R(1.1f, 1.6f));
         var filled = new List<(int i, int j)>();
+        int loose = Mathf.RoundToInt(nx * nz * R(0.35f, 0.55f));
         for (int k = 0; k < loose; k++)
         {
             int i = rng.Next(nx), j = rng.Next(nz);
@@ -34,11 +92,10 @@ static partial class GroceryStoreBuilder
                 if (!filled.Contains((i, j))) filled.Add((i, j));
                 continue;
             }
-            var at = Cell(i, j) + new Vector3(R(-0.3f, 0.3f) * box, heights[i, j] + R(0.4f, 2f), R(-0.3f, 0.3f) * box);
-            var b = SpawnSized(rng.NextDouble() < 0.2 ? open : closed, parent, box * R(0.7f, 1f), R(0f, 360f));
-            AddBoxColliders(b);
-            b.transform.rotation = Quaternion.Euler(R(-35f, 35f), R(0f, 360f), R(-35f, 35f)) * b.transform.rotation;
-            PlaceOnFloor(b, at);
+            var kind = rng.NextDouble() < 0.55 ? BoxKind.Ajar : BoxKind.Open;
+            var b = CardboardBox(parent, kind, cell * R(0.6f, 0.8f), R(0f, 360f),
+                Cell(i, j) + new Vector3(R(-0.15f, 0.15f) * cell, heights[i, j] + 0.3f, R(-0.15f, 0.15f) * cell));
+            b.transform.rotation = Quaternion.Euler(R(-8f, 8f), 0, R(-8f, 8f)) * b.transform.rotation;
             SettleLater(b, force: true);
             heights[i, j] = GetBounds(b).max.y;
         }
@@ -46,9 +103,9 @@ static partial class GroceryStoreBuilder
         // boxes with groceries in them go on last and nearly upright, so nothing lands in them
         foreach (var (i, j) in filled)
         {
-            var b = FilledBox(parent, open, box * R(0.8f, 0.95f), goods, rng);
-            b.transform.rotation = Quaternion.Euler(R(-8f, 8f), R(0f, 360f), R(-8f, 8f));
-            PlaceOnFloor(b, Cell(i, j) + new Vector3(0, heights[i, j] + 0.6f, 0));
+            var b = FilledBox(parent, BoxPrefab(BoxKind.OpenWide), cell * R(0.7f, 0.85f), goods, rng);
+            b.transform.rotation = Quaternion.Euler(R(-5f, 5f), R(0f, 360f), R(-5f, 5f));
+            PlaceOnFloor(b, Cell(i, j) + new Vector3(0, heights[i, j] + 0.3f, 0));
             SettleLater(b, force: true);
             heights[i, j] = GetBounds(b).max.y;
         }
@@ -60,6 +117,7 @@ static partial class GroceryStoreBuilder
         var root = new GameObject("Open Box");
         root.transform.SetParent(parent);
         var b = SpawnSized(open, root.transform, size, 0f);
+        Recolor(b, BoxKind.OpenWide);
         AddBoxColliders(b);
         FillOpenBox(root.transform, b, open, goods, rng, rng.Next(2, 5), raiseToRim: false);
         return root;

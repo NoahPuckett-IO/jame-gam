@@ -25,13 +25,14 @@ static partial class GroceryStoreBuilder
         stock.Select(s => (prefab: LoadModel(s.model), s.size)).Where(t => t.prefab != null)
             .Select(t => MeasureProduct(t.prefab, t.size)).ToList();
 
-    static Material SignTextMaterial(Font font)
+    // backlit signs keep the unlit text; print on boxes and packaging is lit so it doesn't glow in the dark
+    static Material SignTextMaterial(Font font, bool lit = false)
     {
-        string path = $"{MatFolder}/SignText_{font.name}.mat";
+        string path = lit ? $"{MatFolder}/SignTextLit_{font.name}.mat" : $"{MatFolder}/SignText_{font.name}.mat";
         var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
         if (mat == null)
         {
-            mat = new Material(Shader.Find("JameGam/Sign Text"));
+            mat = new Material(Shader.Find(lit ? "JameGam/Sign Text Lit" : "JameGam/Sign Text"));
             AssetDatabase.CreateAsset(mat, path);
         }
         return mat;
@@ -50,19 +51,20 @@ static partial class GroceryStoreBuilder
         ["soup"] = 0xe7d3, ["wine"] = 0xf1e8, ["tag"] = 0xe54e, ["star"] = 0xe838, ["savings"] = 0xe2eb,
         ["burger"] = 0xea61, ["grocery"] = 0xe547,
         ["run"] = 0xe566, ["walk"] = 0xe536, ["balance"] = 0xeaf6, ["hand"] = 0xe769, ["stairs"] = 0xf1a9,
-        ["play"] = 0xe037, ["settings"] = 0xe8b8, ["close"] = 0xe5cd, ["game"] = 0xea28, ["bulb"] = 0xe0f0,
+        ["jump"] = 0xeacf, ["bolt"] = 0xea0b, ["box"] = 0xe1a1, ["ski"] = 0xe509, ["check"] = 0xe86c,
+        ["school"] = 0xe80c, ["play"] = 0xe037, ["settings"] = 0xe8b8, ["close"] = 0xe5cd, ["game"] = 0xea28, ["bulb"] = 0xe0f0,
     };
 
     public static string Glyph(string icon) => Icons.TryGetValue(icon, out int code) ? ((char)code).ToString() : "";
 
-    static void MakeIcon(Transform parent, Vector3 pos, float yaw, string icon, float size, Color color)
+    static void MakeIcon(Transform parent, Vector3 pos, float yaw, string icon, float size, Color color, bool lit = false)
     {
         var font = IconFont();
         if (font == null || icon == null || !Icons.TryGetValue(icon, out int code)) return;
-        MakeText(parent, pos, yaw, ((char)code).ToString(), size, size, color, font);
+        MakeText(parent, pos, yaw, ((char)code).ToString(), size, size, color, font, lit);
     }
 
-    static void MakeText(Transform parent, Vector3 pos, float yaw, string text, float maxWidth, float maxHeight, Color color, Font font = null)
+    static void MakeText(Transform parent, Vector3 pos, float yaw, string text, float maxWidth, float maxHeight, Color color, Font font = null, bool lit = false)
     {
         const int fontSize = 96;
         font = font != null ? font : SignFont();
@@ -78,7 +80,7 @@ static partial class GroceryStoreBuilder
         t.anchor = TextAnchor.MiddleCenter;
         t.alignment = TextAlignment.Center;
         t.color = color;
-        t.GetComponent<MeshRenderer>().sharedMaterial = SignTextMaterial(font);
+        t.GetComponent<MeshRenderer>().sharedMaterial = SignTextMaterial(font, lit);
         t.gameObject.AddComponent<SignText>();
 
         var lines = text.Split('\n');
@@ -295,16 +297,15 @@ static partial class GroceryStoreBuilder
 
     static void DisplayBin(Transform parent, Vector3 at, List<ProductType> types, System.Random rng, int stackHeight)
     {
-        var closed = LoadKenney("cardboardBoxClosed");
-        var open = LoadKenney("cardboardBoxOpen");
-        if (closed == null || open == null || types.Count == 0) return;
+        var open = BoxPrefab(BoxKind.OpenWide);
+        if (open == null || BoxPrefab(BoxKind.Sealed) == null || types.Count == 0) return;
         float box = 0.5f * Scale;
         float y = at.y;
         for (int h = 0; h < stackHeight; h++)
         {
-            var b = SpawnSized(h == stackHeight - 1 ? open : closed, parent, box, (float)rng.NextDouble() * 6f - 3f);
-            PlaceOnFloor(b, new Vector3(at.x, y, at.z));
-            AddBoxColliders(b);
+            bool top = h == stackHeight - 1;
+            var b = CardboardBox(parent, top ? BoxKind.OpenWide : BoxKind.Sealed, top ? box : box * 0.92f, (float)rng.NextDouble() * 6f - 3f,
+                new Vector3(at.x, y, at.z));
             var bb = GetBounds(b);
             y = bb.max.y;
             if (h < stackHeight - 1) continue;

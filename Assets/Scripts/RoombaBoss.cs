@@ -17,7 +17,8 @@ public class RoombaBoss : MonoBehaviour
     [SerializeField] string[] glyphs;
 
     [SerializeField] float viewRange = 46f, viewHalfAngle = 26f;
-    [SerializeField] float scanSeconds = 22f, rampageSeconds = 20f;
+    [SerializeField] float scanSeconds = 30f, rampageSeconds = 20f;
+    [SerializeField] float laneX;
 
     static readonly Color ScanColor = new Color(1f, 0.85f, 0.2f, 0.45f);
     static readonly Color AlertColor = new Color(1f, 0.15f, 0.1f, 0.55f);
@@ -26,10 +27,10 @@ public class RoombaBoss : MonoBehaviour
     Phase phase = Phase.Waiting;
     PlayerController player;
     FallingItemsDirector items;
-    TutorialPopup popup;
     Mesh fanMesh;
     Vector3[] fanVerts;
     float phaseTime, seenTime, chaseLeft, pauseLeft, spin = 35f, spinDir = 1f, nextFlip;
+    bool patrolNorth = true;
     Vector3 target;
     bool rampWest, hasTarget;
     Vector3 homePos;
@@ -42,7 +43,6 @@ public class RoombaBoss : MonoBehaviour
     {
         player = FindAnyObjectByType<PlayerController>();
         items = FindAnyObjectByType<FallingItemsDirector>();
-        popup = FindAnyObjectByType<TutorialPopup>();
         if (player != null) player.Respawned += OnPlayerRespawned;
 
         fanMesh = new Mesh { name = "Vision" };
@@ -82,6 +82,7 @@ public class RoombaBoss : MonoBehaviour
         chaseLeft = 0f;
         pauseLeft = 0f;
         hasTarget = false;
+        patrolNorth = true;
         SetButton(new Color(1f, 0.2f, 0.1f), 2f);
     }
 
@@ -94,7 +95,8 @@ public class RoombaBoss : MonoBehaviour
         {
             case Phase.Waiting:
                 var p = player.transform.position;
-                if (p.z > startZ && p.x > xRange.x - 6f && p.x < xRange.y + 6f && p.y < 20f) StartCoroutine(Wake());
+                // only inside the aisle itself: the tutorial room sits far beyond its north end on the same x
+                if (p.z > startZ && p.z < zRange.y + 30f && p.x > xRange.x - 6f && p.x < xRange.y + 6f && p.y < 20f) StartCoroutine(Wake());
                 return;
             case Phase.Dead:
                 return;
@@ -161,8 +163,6 @@ public class RoombaBoss : MonoBehaviour
         player.CameraLocked = false;
         player.EndCutscene();
         homeRot = transform.rotation;
-        Show(0, "VAC-3000", "Someone left the vacuum on! Dodge its attacks and turn it off to escape.");
-        StartCoroutine(HideCard(6f));
         phase = Phase.Scan;
         phaseTime = 0f;
     }
@@ -176,6 +176,7 @@ public class RoombaBoss : MonoBehaviour
             nextFlip = Time.time + Random.Range(1.5f, 4.5f);
         }
         transform.Rotate(0f, spin * spinDir * Time.deltaTime, 0f);
+        Patrol();
         bool seen = CanSee();
         SetFan(seen ? AlertColor : ScanColor);
         seenTime = seen ? seenTime + Time.deltaTime : 0f;
@@ -189,6 +190,28 @@ public class RoombaBoss : MonoBehaviour
             phase = Phase.Rampage;
             phaseTime = 0f;
             hasTarget = false;
+        }
+    }
+
+    // while it scans it also sweeps up and down the aisle along its clear centre lane, so hiding in one spot
+    // behind a box doesn't work for long: the cone comes round from a new angle as it passes
+    void Patrol()
+    {
+        if (pauseLeft > 0f)
+        {
+            pauseLeft -= Time.deltaTime;
+            return;
+        }
+        float endZ = patrolNorth ? zRange.y - 2f : zRange.x + 2f;
+        float speed = Mathf.Lerp(7f, 12f, phaseTime / scanSeconds);
+        var p = transform.position;
+        p.x = Mathf.MoveTowards(p.x, laneX, speed * Time.deltaTime);
+        p.z = Mathf.MoveTowards(p.z, endZ, speed * Time.deltaTime);
+        transform.position = p;
+        if (Mathf.Abs(p.z - endZ) < 0.01f)
+        {
+            patrolNorth = !patrolNorth;
+            pauseLeft = 0.8f;
         }
     }
 
@@ -401,15 +424,12 @@ public class RoombaBoss : MonoBehaviour
         fan.gameObject.SetActive(false);
         if (statusLight != null) statusLight.enabled = false;
         if (ledRenderer != null) ledRenderer.material.SetColor("_EmissionColor", Color.black);
-        Show(3, "LIGHTS OUT", "The VAC-3000 is switched off and the boxes at the far end have come down. Head for the door!");
         OpenGate();
         for (float t = 0; t < 1.2f; t += Time.deltaTime)
         {
             transform.Rotate(0f, 200f * (1f - t / 1.2f) * Time.deltaTime, 0f);
             yield return null;
         }
-        yield return new WaitForSeconds(6f);
-        if (popup != null) popup.Hide(this);
     }
 
     void OpenGate()
@@ -455,17 +475,6 @@ public class RoombaBoss : MonoBehaviour
         t.gameObject.SetActive(false);
     }
 
-    IEnumerator HideCard(float after)
-    {
-        yield return new WaitForSeconds(after);
-        if (popup != null) popup.Hide(this);
-    }
-
-    void Show(int glyph, string heading, string text)
-    {
-        if (popup != null) popup.Show(this, glyphs != null && glyph < glyphs.Length ? glyphs[glyph] : "", heading, text, null);
-    }
-
     public void Setup(Transform eyeT, Transform fanT, Renderer button, Renderer led, Light light, Transform[] brushSet,
         float bodyRadius, float bodyTop, Vector2 xs, Vector2 zs, float startAt, float westX, float eastX,
         GameObject gateRoot, Collider seal, string[] icons)
@@ -487,5 +496,6 @@ public class RoombaBoss : MonoBehaviour
         gate = gateRoot;
         gateSeal = seal;
         glyphs = icons;
+        laneX = (xs.x + xs.y) / 2f;
     }
 }

@@ -202,8 +202,6 @@ static partial class GroceryStoreBuilder
         foreach (var t in handle.GetComponentsInChildren<Transform>()) t.gameObject.isStatic = false;
 
         root.gameObject.AddComponent<Zipline>().Setup(start, end, handle);
-        TutorialZoneAt(root, from + Vector3.up * (deck + 3f), new Vector3(7f, 6f, 8f), "hand", "ZIPLINE",
-            "Stand under the handle and press E to grab on. Jump to let go early.", "E");
     }
 
     // a wall of ice blocks across a freezer top, just too tall to jump

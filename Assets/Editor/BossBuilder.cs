@@ -29,11 +29,12 @@ static partial class GroceryStoreBuilder
         var spots = new List<Vector2>();
         float zMid = (zS + zN) / 2;
         var can = BeanCanBuilder.GetOrCreate();
-        var crate = LoadKenney("cardboardBoxClosed");
+        var crate = BoxPrefab(BoxKind.Sealed);
         for (int tries = 0; spots.Count < 16 && tries < 400; tries++)
         {
             var p = new Vector2(x + ((float)rng.NextDouble() - 0.5f) * (WalkwayWidth - 10f), Mathf.Lerp(zS + 22f, zN - 12f, (float)rng.NextDouble()));
-            if (Vector2.Distance(p, new Vector2(x, zMid)) < 12f) continue;
+            // the centre lane stays clear: the vacuum patrols up and down it while it scans
+            if (Mathf.Abs(p.x - x) < 8f) continue;
             bool clear = true;
             foreach (var s in spots) if (Vector2.Distance(s, p) < 11f) clear = false;
             if (!clear) continue;
@@ -62,9 +63,7 @@ static partial class GroceryStoreBuilder
                 float y = 0;
                 for (int k = 0; k < 2; k++)
                 {
-                    var c = SpawnSized(crate, root, 4.2f, rng.Next(360));
-                    PlaceOnFloor(c, at + Vector3.up * y);
-                    AddBoxColliders(c);
+                    var c = CardboardBox(root, k == 0 ? BoxKind.Sealed : BoxKind.Ajar, k == 0 ? 4.2f : 3.6f, rng.Next(360), at + Vector3.up * y);
                     y = GetBounds(c).max.y;
                 }
             }
