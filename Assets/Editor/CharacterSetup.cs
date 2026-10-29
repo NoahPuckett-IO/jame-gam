@@ -81,6 +81,8 @@ static class CharacterSetup
         mat.SetTexture("_EmissionMap", skin);
         // a good share of his own colours as glow, so shadows and dim corners never turn him into a silhouette
         mat.SetColor("_EmissionColor", new Color(0.42f, 0.42f, 0.42f));
+        // without this flag URP treats the emission as black whenever it revalidates the material and drops the glow
+        mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
         EditorUtility.SetDirty(mat);
         return mat;
     }

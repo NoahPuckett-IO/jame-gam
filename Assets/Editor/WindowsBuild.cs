@@ -14,6 +14,8 @@ static class WindowsBuild
 
     static void Build(string folderName)
     {
+        PerformanceSettings.Apply();
+        PerformanceSettings.EnsureOcclusion();
         string folder = Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.DesktopDirectory), folderName);
         if (Directory.Exists(folder)) Directory.Delete(folder, true);
         var options = new BuildPlayerOptions

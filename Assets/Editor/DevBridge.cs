@@ -69,6 +69,7 @@ static class DevBridge
         }
         if (pending.Count == 0 || EditorApplication.isCompiling || EditorApplication.isUpdating) return;
         if (EditorApplication.timeSinceStartup < waitUntil) return;
+        if (PerfProbe.Busy) return;
         var cmd = pending.Dequeue();
         try
         {
@@ -102,15 +103,31 @@ static class DevBridge
             case "models": ModelSheet(arg.Split(' ')); break;
             case "warp": Warp(arg); break;
             case "matinfo": MatInfo(arg.Split(' ')); break;
-            case "tutorial": Object.FindAnyObjectByType<MainMenu>().Tutorial(); break;
+            case "tutorial": PlayingOnly(); Object.FindAnyObjectByType<MainMenu>().Tutorial(); break;
             case "tp": Teleport(arg.Split(' ').Select(F).ToArray()); break;
             case "grab": Grab(); break;
             case "drop": Drop(); break;
             case "pos": Pos(); break;
-            case "start": Object.FindAnyObjectByType<MainMenu>().Play(); break;
-            case "skip": SkipIntro(); break;
+            case "start": PlayingOnly(); Object.FindAnyObjectByType<MainMenu>().Play(); break;
+            case "skip": PlayingOnly(); SkipIntro(); break;
+            case "reopen": UnityEditor.SceneManagement.EditorSceneManager.OpenScene("Assets/JameGamGame.unity"); break;
+            case "census": PerfProbe.Census(arg); break;
+            case "perf": PerfProbe.Perf(arg); break;
+            case "looks": PerfProbe.Looks(arg); break;
+            case "diff": PerfProbe.Diff(arg); break;
+            case "tweak": PerfProbe.Tweak(arg); break;
+            case "benchbuild": PerfProbe.BenchBuild(arg); break;
+            case "matkw": PerfProbe.MatKeywords(arg); break;
+            case "combinecensus": PerfProbe.CombineCensus(arg); break;
+            case "mergecheck": PerfProbe.MergeCheck(); break;
             default: throw new System.Exception("unknown command");
         }
+    }
+
+    // menu and intro calls made outside play mode would switch the menu off in the saved scene
+    static void PlayingOnly()
+    {
+        if (!Application.isPlaying) throw new System.Exception("only in play mode");
     }
 
     // shots.txt: "name ex ey ez tx ty tz [fov]" with world positions, or "name @Object dx dy dz [fov]" to look at

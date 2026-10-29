@@ -205,6 +205,8 @@ static partial class GroceryStoreBuilder
 
         MenuBuilder.Build(controller, spawn);
         BuildMusic();
+        PerformanceSettings.Apply();
+        StaticOcclusionCulling.Clear();
 
         if (Camera.main != null)
         {
