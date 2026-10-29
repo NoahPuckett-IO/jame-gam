@@ -20,6 +20,8 @@ public class BouncePad : MonoBehaviour
         if (player == null) return;
         player.Launch(launchSpeed);
         squash = 1f;
+        Sfx.Play("boing", 0.45f, Random.Range(0.95f, 1.05f));
+        GameFeel.Puff(player.transform.position + Vector3.down, 8);
     }
 
     void Update()

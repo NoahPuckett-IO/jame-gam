@@ -21,6 +21,9 @@ static class WebGLBuild
     {
         PerformanceSettings.Apply();
         PerformanceSettings.EnsureOcclusion();
+        // the editor sometimes revalidates Henry.mat and drops its _EMISSION keyword; put his glow back before every build
+        CharacterSetup.HenryMaterial();
+        AssetDatabase.SaveAssets();
         // itch serves files without Content-Encoding headers, so Gzip needs the decompression fallback.
         PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Gzip;
         PlayerSettings.WebGL.decompressionFallback = true;

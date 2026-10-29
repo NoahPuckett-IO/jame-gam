@@ -16,6 +16,9 @@ static class WindowsBuild
     {
         PerformanceSettings.Apply();
         PerformanceSettings.EnsureOcclusion();
+        // the editor sometimes revalidates Henry.mat and drops its _EMISSION keyword; put his glow back before every build
+        CharacterSetup.HenryMaterial();
+        AssetDatabase.SaveAssets();
         string folder = Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.DesktopDirectory), folderName);
         if (Directory.Exists(folder)) Directory.Delete(folder, true);
         var options = new BuildPlayerOptions

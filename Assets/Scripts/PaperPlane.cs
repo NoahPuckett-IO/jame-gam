@@ -127,6 +127,11 @@ public class PaperPlane : PlayerRide
         }
     }
 
+    protected override string BoardSound => "whoosh";
+    protected override string LoopSound => "zip";
+    protected override float RideLoudness => 0.3f;
+    protected override float RidePitch => 0.6f;
+
     protected override void OnLeft()
     {
         if (!landed) Home();

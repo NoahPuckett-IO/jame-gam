@@ -39,11 +39,13 @@ public class Zipline : PlayerRide
             returnT = Mathf.Min(1f, returnT + Time.deltaTime / 1.6f);
             if (handle != null) handle.position = HandleAt(1f - Mathf.SmoothStep(0f, 1f, returnT));
         }
-        if (!CanBoard || returnT < 1f || !player.IsGrounded || !InteractPressed) return;
+        if (!CanBoard || returnT < 1f || !player.IsGrounded) return;
         var h = HandleAt(0f);
         var feet = player.transform.position + Vector3.down;
         var flat = new Vector3(h.x - feet.x, 0f, h.z - feet.z);
         if (flat.magnitude > grabRadius || h.y - feet.y > 3.4f || h.y < feet.y) return;
+        Hud.Hint(this, "GRAB ZIPLINE");
+        if (!InteractPressed) return;
 
         t = 0f;
         speed = 2f;
@@ -89,6 +91,10 @@ public class Zipline : PlayerRide
     }
 
     protected override void OnLeft() => returnT = 0f;
+
+    protected override string LoopSound => "zip";
+    protected override float RideLoudness => Mathf.Lerp(0.15f, 0.6f, speed / topSpeed);
+    protected override float RidePitch => Mathf.Lerp(0.7f, 1.3f, speed / topSpeed);
 
     public void Setup(Vector3 from, Vector3 to, Transform grip)
     {

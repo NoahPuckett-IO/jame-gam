@@ -38,11 +38,12 @@ static class FloatingCheck
                     if (!other.transform.IsChildOf(r.transform)) supported = true;
                 if (supported) break;
             }
-            if (!supported) found.Add((path, gap));
+            if (!supported) found.Add((path + $" @{b.center:F1} gap {gap:F2}", gap));
         }
-        var groups = found.GroupBy(f => f.path.Substring(0, Mathf.Max(0, f.path.LastIndexOf('/'))))
+        var groups = found.GroupBy(f => f.path.Substring(0, Mathf.Max(0, f.path.Split(" @")[0].LastIndexOf('/'))))
             .OrderByDescending(g => g.Count()).Take(40);
-        var report = $"{found.Count} unsupported props\n" + string.Join("\n", groups.Select(g => $"{g.Count(),4}  {g.Key}  e.g. {g.First().path.Substring(g.Key.Length)}"));
+        var report = $"{found.Count} unsupported props\n" + string.Join("\n", groups.Select(g => $"{g.Count(),4}  {g.Key}  e.g. {g.First().path.Substring(g.Key.Length)}"))
+                     + "\n\nall:\n" + string.Join("\n", found.Select(f => f.path));
         System.IO.File.WriteAllText(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "TinyHenrySnapshots", "floating.txt"), report);
         Debug.Log("[FloatingCheck] " + report);
     }

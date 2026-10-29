@@ -113,10 +113,29 @@ public class RoombaBoss : MonoBehaviour
         CheckTouch();
     }
 
+    AudioSource motor;
+    Vector3 lastPos;
+
+    // motor hum follows how fast the brushes spin and how fast it's driving
+    void LateUpdate()
+    {
+        if (motor == null)
+        {
+            if (brushSpeed <= 0f) return;
+            motor = Sfx.Loop(gameObject, "motor", 1f);
+            lastPos = transform.position;
+        }
+        float moving = (transform.position - lastPos).magnitude / Mathf.Max(Time.deltaTime, 1e-4f);
+        lastPos = transform.position;
+        Sfx.Fade(motor, brushSpeed > 0f ? Mathf.Lerp(0.25f, 0.6f, moving / 30f) : 0f, 1.5f);
+        motor.pitch = Mathf.Lerp(0.8f, 1.6f, moving / 30f);
+    }
+
     IEnumerator Wake()
     {
         phase = Phase.Dead;
         player.BeginCutscene();
+        GameMusic.Duck = 0.3f;
         player.CameraLocked = true;
         var cam = Camera.main.transform;
         var fromPos = cam.position;
@@ -134,6 +153,7 @@ public class RoombaBoss : MonoBehaviour
 
         var red = new Color(1f, 0.2f, 0.1f);
         if (statusLight != null) statusLight.enabled = true;
+        Sfx.Play("alarm", 0.8f, 1f, transform.position);
         for (float t = 0; t < 1.8f; t += Time.deltaTime)
         {
             float k = t / 1.8f;
@@ -149,6 +169,7 @@ public class RoombaBoss : MonoBehaviour
         }
         transform.position = homePos;
         PlayerController.Shake(0.4f);
+        Sfx.Play("slam", 0.7f, 1.3f, transform.position);
         fan.gameObject.SetActive(true);
         SetFan(ScanColor);
         UpdateFan();
@@ -162,6 +183,7 @@ public class RoombaBoss : MonoBehaviour
         }
         player.CameraLocked = false;
         player.EndCutscene();
+        GameMusic.Duck = 1f;
         homeRot = transform.rotation;
         phase = Phase.Scan;
         phaseTime = 0f;
@@ -190,6 +212,7 @@ public class RoombaBoss : MonoBehaviour
             phase = Phase.Rampage;
             phaseTime = 0f;
             hasTarget = false;
+            Sfx.Play("alarm", 0.9f, 1.2f, transform.position);
         }
     }
 
@@ -244,6 +267,7 @@ public class RoombaBoss : MonoBehaviour
             phaseTime = 0f;
             hasTarget = false;
             SetButton(new Color(0.2f, 1f, 0.35f), 4f);
+            Sfx.Play("powerdown", 0.5f, 1.8f, transform.position);
         }
     }
 
@@ -323,6 +347,8 @@ public class RoombaBoss : MonoBehaviour
     void Slam(bool west)
     {
         PlayerController.Shake(0.7f);
+        Sfx.Play("slam", 1f, Random.Range(0.9f, 1.1f), transform.position);
+        GameFeel.Puff(transform.position + transform.forward * radius, 12);
         if (items == null) return;
         float shelfX = west ? westShelfX : eastShelfX;
         float wallX = west ? xRange.x - radius : xRange.y + radius;
@@ -363,6 +389,12 @@ public class RoombaBoss : MonoBehaviour
     {
         var away = player.transform.position - transform.position;
         away.y = 0f;
+        if (!player.InCutscene && Time.time - lastZap > 2.5f)
+        {
+            lastZap = Time.time;
+            Sfx.Play("zap", 1f);
+            GameFeel.Sparks(player.transform.position + Vector3.up * 0.5f, 18, new Color(1f, 0.9f, 0.4f));
+        }
         player.GetComponent<FallingHitResponder>()?.Kill(away.normalized);
         chaseLeft = 0f;
     }
@@ -420,6 +452,13 @@ public class RoombaBoss : MonoBehaviour
         phase = Phase.Dead;
         player.Launch(10f);
         PlayerController.Shake(0.5f);
+        var buttonTop = buttonRenderer != null ? buttonRenderer.transform.position : transform.position + Vector3.up * 1.5f;
+        Sfx.Play("stomp", 1f);
+        Sfx.Play("powerdown", 0.9f, 1f, transform.position);
+        GameFeel.Sparks(buttonTop, 40, new Color(0.5f, 1f, 0.6f));
+        GameFeel.Puff(transform.position, 16);
+        StartCoroutine(Flash());
+        Invoke(nameof(Fanfare), 0.9f);
         SetButton(Color.black, 0f);
         fan.gameObject.SetActive(false);
         if (statusLight != null) statusLight.enabled = false;
@@ -429,6 +468,26 @@ public class RoombaBoss : MonoBehaviour
         {
             transform.Rotate(0f, 200f * (1f - t / 1.2f) * Time.deltaTime, 0f);
             yield return null;
+        }
+    }
+
+    float lastZap = -99f;
+
+    void Fanfare() => Sfx.Play("victory", 0.8f);
+
+    // the whole body blinks white a few times as it shorts out
+    IEnumerator Flash()
+    {
+        var block = new MaterialPropertyBlock();
+        var parts = GetComponentsInChildren<MeshRenderer>();
+        for (int i = 0; i < 3; i++)
+        {
+            block.SetColor("_BaseColor", Color.white);
+            block.SetColor("_EmissionColor", Color.white * 2f);
+            foreach (var r in parts) if (r.transform != fan) r.SetPropertyBlock(block);
+            yield return new WaitForSeconds(0.07f);
+            foreach (var r in parts) r.SetPropertyBlock(null);
+            yield return new WaitForSeconds(0.12f);
         }
     }
 

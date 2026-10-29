@@ -27,8 +27,7 @@ public class PlayerSounds : MonoBehaviour
         player = GetComponent<PlayerController>();
         if (player != null)
         {
-            player.Jumped += Grunt;
-            player.Dashed += Grunt;
+            player.Jumped += JumpGrunt;
         }
         lastPos = transform.position;
     }
@@ -88,6 +87,14 @@ public class PlayerSounds : MonoBehaviour
         source.pitch = Random.Range(0.92f, 1.1f);
         float v = stepVolume * loudness * Mathf.Lerp(0.85f, 1f, Mathf.InverseLerp(4f, 22f, speed));
         source.PlayOneShot(steps[k], v * GameSettings.Sfx);
+    }
+
+    // jumps (and bounce pad launches) use their own grunt; dashes only whoosh (GameFeel)
+    void JumpGrunt()
+    {
+        if (Time.time - lastGrunt < 0.25f) return;
+        lastGrunt = Time.time;
+        Sfx.Play("jump", gruntVolume);
     }
 
     public void Grunt()

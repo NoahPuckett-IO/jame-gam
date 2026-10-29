@@ -51,6 +51,12 @@ public class TutorialRoom : MonoBehaviour
         player.SetLook(start.eulerAngles.y, 12f);
         player.Respawned += OnRespawned;
         player.enabled = true;
+        var fader = ScreenFader.Instance;
+        if (fader != null)
+        {
+            fader.Set(1f);
+            StartCoroutine(fader.Fade(0f, 0.6f));
+        }
         StartCoroutine(Show(0, 0.8f));
     }
 

@@ -17,7 +17,10 @@ public class Ladder : PlayerRide
     float mountT, exitT = -1f;
     Vector3 mountFrom, exitFrom;
     float lastRung;
+    int tapRung;
     bool descendHeld;
+
+    protected override string BoardSound => "rung";
 
     // the climber's right while facing the ladder (they face -outward)
     Vector3 Right => Vector3.Cross(outward, Vector3.up).normalized;
@@ -46,6 +49,7 @@ public class Ladder : PlayerRide
         float along = Vector3.Dot(rel, Right), away = Vector3.Dot(rel, outward);
         float feet = p.y - 1f - foot.y;
         if (Mathf.Abs(along) > halfWidth + 1f || away < -0.6f || away > 2.4f || feet > 0.8f || feet < -0.5f) return;
+        Hud.Hint(this, "CLIMB");
 
         var input = player.MoveInput;
         var wish = Quaternion.Euler(0f, player.Yaw, 0f) * new Vector3(input.x, 0f, input.y);
@@ -58,6 +62,7 @@ public class Ladder : PlayerRide
         mountT = 0f;
         exitT = -1f;
         Board("Climb");
+        tapRung = Mathf.FloorToInt(height / rungSpacing);
     }
 
     // standing on the ledge at the top: walk to the edge over the ladder (or press E) to swing on and climb down
@@ -72,6 +77,7 @@ public class Ladder : PlayerRide
         toLadder.y = 0f;
         float along = Vector3.Dot(p - foot, Right);
         if (fromLanding.magnitude > 2.4f || Mathf.Abs(along) > halfWidth + 0.6f) return false;
+        Hud.Hint(this, "CLIMB DOWN");
 
         var input = player.MoveInput;
         var wish = Quaternion.Euler(0f, player.Yaw, 0f) * new Vector3(input.x, 0f, input.y);
@@ -85,6 +91,7 @@ public class Ladder : PlayerRide
         mountT = 0f;
         exitT = -1f;
         Board("Climb");
+        tapRung = Mathf.FloorToInt(height / rungSpacing);
         return true;
     }
 
@@ -109,6 +116,9 @@ public class Ladder : PlayerRide
         // swung on from the top while walking at it: keep walking that way to climb down, until the stick is let go
         if (descendHeld) { if (v > 0.2f) v = -v; else descendHeld = false; }
         if (Mathf.Abs(v) > 0.2f) height += Mathf.Sign(v) * ClimbSpeed * Time.deltaTime;
+        // a tap each time a hand reaches the next rung
+        int rung = Mathf.FloorToInt(height / rungSpacing);
+        if (rung != tapRung) { tapRung = rung; Sfx.Play("rung", 0.5f, Random.Range(0.9f, 1.15f)); }
 
         if (height <= 0f && v < -0.2f) { Leave(outward * 2f); return; }
         height = Mathf.Max(0f, height);

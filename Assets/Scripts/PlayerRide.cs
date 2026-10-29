@@ -120,6 +120,22 @@ public abstract class PlayerRide : MonoBehaviour
         player.Respawned += OnRespawned;
         if (anim != null) anim.Play(state, 0.15f);
         if (grounder != null) grounder.enabled = false;
+        Sfx.Play(BoardSound, 0.7f);
+        if (loop == null && LoopSound != null) loop = Sfx.Loop(gameObject, LoopSound, 0f);
+    }
+
+    // what plays on getting on, and the loop that runs while riding (louder as RideLoudness rises)
+    protected virtual string BoardSound => "pickup";
+    protected virtual string LoopSound => null;
+    protected virtual float RideLoudness => 0.5f;
+    protected virtual float RidePitch => 1f;
+    AudioSource loop;
+
+    void LateUpdate()
+    {
+        if (loop == null) return;
+        Sfx.Fade(loop, riding ? RideLoudness : 0f, 3f);
+        loop.pitch = RidePitch;
     }
 
     protected void Leave(Vector3 velocity, float cooldown = 0.6f)

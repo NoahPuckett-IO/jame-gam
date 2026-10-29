@@ -6,17 +6,25 @@ public class Carryable : MonoBehaviour
 
     public bool IsHeld { get; private set; }
 
-    void Awake() => colliders = GetComponentsInChildren<Collider>();
+    public static readonly System.Collections.Generic.List<Carryable> All = new System.Collections.Generic.List<Carryable>();
 
+    void Awake() => colliders = GetComponentsInChildren<Collider>();
+    void OnEnable() => All.Add(this);
+    void OnDisable() => All.Remove(this);
+
+    float height = -1f;
+
+    // measured once: the hands look this up every frame for every item to decide what's in reach
     public float Height
     {
         get
         {
+            if (height >= 0f) return height;
             var rs = GetComponentsInChildren<Renderer>();
-            if (rs.Length == 0) return 1f;
+            if (rs.Length == 0) return height = 1f;
             var b = rs[0].bounds;
             foreach (var r in rs) b.Encapsulate(r.bounds);
-            return b.size.y;
+            return height = b.size.y;
         }
     }
 

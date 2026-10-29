@@ -24,6 +24,7 @@ public class FallingHitResponder : MonoBehaviour
         player.Knock(away * 14f + Vector3.up * 6f);
         player.LockMovement(2.2f);
         anim?.Play("Death", 0.1f);
+        Sfx.Play("hurt", 0.45f);
         PlayerController.Shake(0.5f);
         yield return new WaitForSeconds(1.4f);
         var fader = ScreenFader.Instance;
@@ -39,6 +40,7 @@ public class FallingHitResponder : MonoBehaviour
         busy = true;
         var player = GetComponent<PlayerController>();
         GetComponent<PlayerAnimator>()?.PlayHit();
+        Sfx.Play("hurt", 0.45f);
         player.Knock(away * 18f + Vector3.up * 8f);
         player.LockMovement(1f);
         yield return new WaitForSeconds(0.5f);

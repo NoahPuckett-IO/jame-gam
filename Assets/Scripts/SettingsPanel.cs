@@ -83,9 +83,18 @@ public class SettingsPanel : MonoBehaviour
         Row(card, "MASTER VOLUME", 160, GameSettings.Master, v => GameSettings.Master = v);
         Row(card, "MUSIC", 85, GameSettings.Music, v => GameSettings.Music = v);
         Row(card, "SOUND EFFECTS", 10, GameSettings.Sfx, v => GameSettings.Sfx = v);
-        UiKit.Label(card, "MOUSE", titleFont, 44, UiKit.Accent, TextAnchor.MiddleLeft, new Vector2(-300, -80), new Vector2(520, 60));
+        UiKit.Label(card, "MOUSE & SCREEN", titleFont, 44, UiKit.Accent, TextAnchor.MiddleLeft, new Vector2(-300, -80), new Vector2(520, 60));
         Row(card, "LOOK SENSITIVITY", -150, Mathf.InverseLerp(0.25f, 2.5f, GameSettings.Sensitivity),
             v => GameSettings.Sensitivity = Mathf.Lerp(0.25f, 2.5f, v));
+        UiKit.Label(card, "FULLSCREEN", bodyFont, 28, new Color(0.85f, 0.9f, 0.9f), TextAnchor.MiddleLeft, new Vector2(-405, -225), new Vector2(310, 50));
+        var full = UiKit.Button(card, "", new Vector2(-135, -225), new Vector2(200, 50), false, null, MenuButtonFx.Sound.Click, 30);
+        fullLabel = full.transform.Find("Label").GetComponent<Text>();
+        full.onClick.AddListener(() =>
+        {
+            Screen.fullScreen = !Screen.fullScreen;
+            // the switch lands next frame, so show where it's going rather than where it is
+            fullLabel.text = Screen.fullScreen ? "OFF" : "ON";
+        });
 
         UiKit.Label(card, "CONTROLS", titleFont, 44, UiKit.Accent, TextAnchor.MiddleLeft, new Vector2(300, 230), new Vector2(520, 60));
         float y = 168f;
@@ -129,8 +138,11 @@ public class SettingsPanel : MonoBehaviour
         return -1;
     }
 
+    Text fullLabel;
+
     void Refresh()
     {
+        if (fullLabel != null) fullLabel.text = Screen.fullScreen ? "ON" : "OFF";
         foreach (var (text, action, index) in keyLabels)
             text.text = action.GetBindingDisplayString(index, InputBinding.DisplayStringOptions.DontIncludeInteractions).ToUpper();
     }

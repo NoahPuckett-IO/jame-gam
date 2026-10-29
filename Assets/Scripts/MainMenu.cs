@@ -13,6 +13,17 @@ public class MainMenu : MonoBehaviour
         AudioListener.pause = false;
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
+        // quitting does nothing in a browser tab, so the web build leaves the button out
+        if (Application.platform == RuntimePlatform.WebGLPlayer)
+            foreach (var b in GetComponentsInChildren<UnityEngine.UI.Button>(true))
+                if (b.name == "Quit Button") b.gameObject.SetActive(false);
+        // coming back from the game the screen is black; ease the menu in
+        var fader = ScreenFader.Instance;
+        if (fader != null)
+        {
+            fader.Set(1f);
+            StartCoroutine(fader.Fade(0f, 0.5f));
+        }
     }
 
     public void Play()

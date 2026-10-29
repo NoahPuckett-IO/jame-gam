@@ -39,6 +39,11 @@ public class LieSlide : PlayerRide
         if (limbs != null) limbs.Snap();
     }
 
+    protected override string BoardSound => "drop";
+    protected override string LoopSound => "scrape";
+    protected override float RideLoudness => Mathf.Lerp(0.2f, 0.7f, speed / 34f);
+    protected override float RidePitch => Mathf.Lerp(0.8f, 1.4f, speed / 34f);
+
     void Update()
     {
         if (player == null || !riding) return;

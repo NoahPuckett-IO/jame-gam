@@ -868,8 +868,13 @@ static partial class GroceryStoreBuilder
                     if (!HasSurface(upTris, px, zc - w * 0.4f, y) || !HasSurface(upTris, px, zc + w * 0.4f, y)) continue;
 
                     var p = Spawn(type.prefab, parent, type.yaw + (side > 0 ? 0 : 180), s * rand(0.93f, 1f));
-                    bool tipped = rng.NextDouble() < 0.025 && bnd.y * s < w * 3;
-                    p.transform.rotation = Quaternion.Euler(tipped ? 90 : 0, rand(-9f, 9f), 0) * p.transform.rotation;
+                    // knocked over: only squat upright things (cans, jars) whose lying length still fits their slot. A dish on
+                    // its edge looks placed, and a tall bottle lying down pokes through its neighbours
+                    bool tipped = rng.NextDouble() < 0.025 && bnd.y * s < w * 1.2f && bnd.y > Mathf.Max(bnd.x, bnd.z) * 0.9f;
+                    // the little random twist mustn't swing a deep item's corners into the row behind or the other side
+                    float slack = boardDepth - rows * d - rows * gap;
+                    float twist = Mathf.Min(9f, Mathf.Asin(Mathf.Clamp01(slack / Mathf.Max(w, 0.01f))) * Mathf.Rad2Deg);
+                    p.transform.rotation = Quaternion.Euler(tipped ? 90 : 0, rand(-twist, twist), 0) * p.transform.rotation;
                     PlaceOnFloor(p, new Vector3(px, y, zc));
                     AddBoxColliders(p);
                 }

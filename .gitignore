@@ -49,3 +49,6 @@ crashlytics-build.properties
 .DS_Store
 Thumbs.db
 /Data/Plugins/
+
+# editor bridge output (renders, logs, command file)
+/DebugOut/

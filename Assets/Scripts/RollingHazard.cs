@@ -51,6 +51,7 @@ public class RollingHazard : MonoBehaviour
         player.Knock(dir * 20f + away.normalized * 6f + Vector3.up * 7f);
         player.LockMovement(0.35f);
         player.GetComponent<PlayerAnimator>()?.PlayHit();
+        Sfx.Play("canhit", 0.8f, 1f, transform.position);
         hitCooldown = 0.8f;
     }
 

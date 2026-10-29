@@ -336,15 +336,36 @@ static partial class GroceryStoreBuilder
     static void SetOnTop(GameObject target, Transform parent, List<ProductType> types, System.Random rng, Vector3 around, float spread, int count)
     {
         var up = UpwardTriangles(target);
+        // the counter's own worktop is the lowest top under the spread; anything higher is a till or scale standing on it
+        float worktop = float.MaxValue;
+        for (float fx = -0.5f; fx <= 0.5f; fx += 0.25f)
+            for (float fz = -0.25f; fz <= 0.25f; fz += 0.25f)
+            {
+                var s = SurfacesAt(up, around.x + fx * spread, around.z + fz * spread);
+                if (s.Count > 0) worktop = Mathf.Min(worktop, s[s.Count - 1]);
+            }
+        var placed = new List<(Vector3 at, float radius)>();
         for (int i = 0; i < count; i++)
         {
             float x = around.x + ((float)rng.NextDouble() - 0.5f) * spread;
             float z = around.z + ((float)rng.NextDouble() - 0.5f) * spread * 0.5f;
             var tops = SurfacesAt(up, x, z);
-            if (tops.Count == 0) continue;
             var t = types[rng.Next(types.Count)];
+            if (tops.Count == 0 || tops[tops.Count - 1] > worktop + 0.03f * Scale) continue;
+            float radius = t.size * 0.5f;
+            // its whole footprint has to be clear worktop, not wedged against the till
+            bool clear = true;
+            foreach (var o in new[] { new Vector2(1, 1), new Vector2(-1, 1), new Vector2(1, -1), new Vector2(-1, -1) })
+            {
+                var under = SurfacesAt(up, x + o.x * radius, z + o.y * radius);
+                if (under.Count == 0 || under[under.Count - 1] > worktop + 0.03f * Scale) clear = false;
+            }
+            if (!clear) continue;
+            var at = new Vector3(x, tops[tops.Count - 1], z);
+            if (placed.Any(o => new Vector2(o.at.x - x, o.at.z - z).magnitude < o.radius + radius)) continue;
+            placed.Add((at, radius));
             var p = Spawn(t.prefab, parent, t.yaw + (float)rng.NextDouble() * 360f, t.size / Mathf.Max(t.bounds.x, t.bounds.y, t.bounds.z));
-            PlaceOnFloor(p, new Vector3(x, tops[tops.Count - 1], z));
+            PlaceOnFloor(p, at);
             AddBoxColliders(p);
         }
     }
@@ -438,7 +459,8 @@ static partial class GroceryStoreBuilder
 
         for (int i = 0; i < 3; i++)
             DisplayBin(root, new Vector3(left + CheckoutWidth * 0.25f, 0, (1.0f + i * 0.6f) * Scale + DoorWidth / 2), produce, rng, 1);
-        foreach (float z in new[] { -7f, 7f })
+        // the north one sits a little further in so it clears the freezer against that wall
+        foreach (float z in new[] { -7f, 6f })
             DisplayBin(root, new Vector3(left + CheckoutWidth * 0.75f, 0, z * Scale), snacks, rng, 2);
 
         void Prop(string name, float height, float maxLen, bool alongX, Vector3 at)

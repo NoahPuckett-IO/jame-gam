@@ -14,13 +14,21 @@ static partial class GroceryStoreBuilder
         float wallZ = depth / 2 - CoolerDepth;
 
         int units = Mathf.Max(1, Mathf.RoundToInt(aisleLength / shelf.length));
-        var aisle = BuildAisle(5, store, edge - shelf.gondolaDepth / 2, units, aisleLength, shelfPrefab, shelf);
-        StockAisle(aisle, shelf, aisleLength, Stock[Stock.Length - 1], sides: new[] { 1 });
+        // the store already put aisle 5 here and stocked both faces; building it again doubled every shelf and product
+        if (store.Find("Aisle 5") == null)
+        {
+            var aisle = BuildAisle(5, store, edge - shelf.gondolaDepth / 2, units, aisleLength, shelfPrefab, shelf);
+            StockAisle(aisle, shelf, aisleLength, Stock[Stock.Length - 1], sides: new[] { 1 });
+        }
         HangAisleSign(store, x, zS, 5, "CLEANING SUPPLIES", 0);
         Seal(root, "Above Aisle 5", new Vector3(edge - shelf.gondolaDepth / 2, (ShelfHeight - 0.4f + WallHeight) / 2, 0), new Vector3(shelf.gondolaDepth, WallHeight - ShelfHeight + 0.4f, aisleLength));
 
         EndBlock(root, "South Block", edge - shelf.gondolaDepth, edge, -wallZ, zS, out _);
         var gate = EndBlock(root, "Exit Gate", edge - shelf.gondolaDepth, edge, zN, wallZ, out var gateSeal);
+        // the aisle's own blockade pile and an endcap display were built on these same spots, so their boxes sat
+        // half inside the boss's; clear them out (the endcap ones would also be left standing in the opened gate)
+        ClearBoxes(store, new Bounds(new Vector3(edge - shelf.gondolaDepth / 2, 0, (-wallZ + zS) / 2), new Vector3(shelf.gondolaDepth, 200, zS + wallZ)));
+        ClearBoxes(store, new Bounds(new Vector3(edge - shelf.gondolaDepth / 2, 0, (zN + wallZ) / 2), new Vector3(shelf.gondolaDepth, 200, wallZ - zN)));
 
         CheckpointAt(root, "Checkpoint Boss", new Vector3(x, 0, zS + 6f), new Vector3(WalkwayWidth, 4, 3), 0);
         devWarps.Add(("Boss", new Vector3(x, 1, zS + 6f), 0));
@@ -89,6 +97,24 @@ static partial class GroceryStoreBuilder
             var bodyFont = AssetDatabase.LoadAssetAtPath<Font>("Assets/Fonts/Oswald.ttf") ?? titleFont;
             end.AddComponent<EndCredits>().Setup(titleFont, bodyFont, Vector3.left);
             devWarps.Add(("Exit", door.transform.position + new Vector3(24f, 1f, 0f), -90));
+        }
+    }
+
+    static void ClearBoxes(Transform store, Bounds area)
+    {
+        foreach (var group in new[] { "Blockades", "Endcaps" })
+        {
+            var g = store.Find(group);
+            if (g == null) continue;
+            foreach (var t in g.GetComponentsInChildren<Transform>(true))
+            {
+                // the blockade keeps its invisible blocker and the stock spilled in front; an endcap goes entirely
+                if (t == null || t == g) continue;
+                bool take = group == "Endcaps" ? t.parent == g : t.name.Contains("Box") && !t.parent.name.Contains("Box");
+                if (!take) continue;
+                var c = t.position;
+                if (c.x > area.min.x && c.x < area.max.x && c.z > area.min.z && c.z < area.max.z) Object.DestroyImmediate(t.gameObject);
+            }
         }
     }
 

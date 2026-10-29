@@ -37,6 +37,8 @@ public class CrumblePlatform : MonoBehaviour
             yield return null;
         }
         foreach (var c in solids) c.enabled = false;
+        // a crunch as it gives way; the thin ice gets a softer one than the crackers
+        Sfx.Play("crunch", name.Contains("Ice") ? 0.35f : 0.55f, Random.Range(0.95f, 1.08f), transform.position);
         var spin = Random.onUnitSphere;
         float v = 0f;
         for (float t = 0; t < 1.2f; t += Time.deltaTime)

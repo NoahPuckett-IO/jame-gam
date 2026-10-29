@@ -100,6 +100,9 @@ static class DevBridge
             case "clearlog": File.WriteAllText(LogPath, ""); File.WriteAllText(StatusPath, ""); break;
             case "shots": Shots(); break;
             case "find": Find(arg); break;
+            case "near": Near(arg.Split(' ').Select(F).ToArray()); break;
+            case "snap": ScreenCapture.CaptureScreenshot(Path.Combine(Root, (arg.Length > 0 ? arg : "snap") + ".png")); break;
+            case "key": PlayingOnly(); PressKey(arg); break;
             case "models": ModelSheet(arg.Split(' ')); break;
             case "warp": Warp(arg); break;
             case "matinfo": MatInfo(arg.Split(' ')); break;
@@ -206,6 +209,33 @@ static class DevBridge
             }
         }
         File.WriteAllText(System.IO.Path.Combine(Root, "find.txt"), sb.ToString());
+    }
+
+    // near x y z r: every renderer whose bounds centre is within r of the point, nearest first, into near.txt
+    static void Near(float[] p)
+    {
+        var at = new Vector3(p[0], p[1], p[2]);
+        var hits = Object.FindObjectsByType<Renderer>()
+            .Where(r => r.gameObject.scene.IsValid() && Vector3.Distance(r.bounds.center, at) < p[3])
+            .OrderBy(r => Vector3.Distance(r.bounds.center, at)).Take(60)
+            .Select(r => $"{PathOf(r.transform)} centre={r.bounds.center} size={r.bounds.size} rot={r.transform.eulerAngles}");
+        File.WriteAllText(System.IO.Path.Combine(Root, "near.txt"), string.Join("\n", hits));
+    }
+
+    // key Space: taps a key on the virtual keyboard, letting go again a moment later
+    static void PressKey(string name)
+    {
+        var key = (UnityEngine.InputSystem.Key)System.Enum.Parse(typeof(UnityEngine.InputSystem.Key), name, true);
+        var kb = UnityEngine.InputSystem.Keyboard.current;
+        UnityEngine.InputSystem.InputSystem.QueueStateEvent(kb, new UnityEngine.InputSystem.LowLevel.KeyboardState(key));
+        double release = EditorApplication.timeSinceStartup + 0.15;
+        void Up()
+        {
+            if (EditorApplication.timeSinceStartup < release) return;
+            EditorApplication.update -= Up;
+            UnityEngine.InputSystem.InputSystem.QueueStateEvent(kb, new UnityEngine.InputSystem.LowLevel.KeyboardState());
+        }
+        EditorApplication.update += Up;
     }
 
     static string PathOf(Transform t) => t.parent == null ? t.name : PathOf(t.parent) + "/" + t.name;

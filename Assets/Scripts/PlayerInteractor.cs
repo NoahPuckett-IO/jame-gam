@@ -30,6 +30,12 @@ public class PlayerInteractor : MonoBehaviour
     void Update()
     {
         if (player.InCutscene || player.Attached || busy || !player.IsGrounded) return;
+        if (held == null)
+        {
+            var near = Nearest();
+            if (near != null) Hud.Hint(this, "PICK UP");
+        }
+
         bool pressed = false;
         foreach (var c in interact.controls)
             if (c is UnityEngine.InputSystem.Controls.ButtonControl b && b.wasPressedThisFrame) pressed = true;
@@ -41,11 +47,17 @@ public class PlayerInteractor : MonoBehaviour
             return;
         }
 
+        var best = Nearest();
+        if (best != null) StartCoroutine(PickUp(best));
+    }
+
+    Carryable Nearest()
+    {
         Carryable best = null;
         float bestScore = float.MaxValue;
-        foreach (var c in FindObjectsByType<Carryable>())
+        foreach (var c in Carryable.All)
         {
-            if (c.IsHeld) continue;
+            if (c.IsHeld || Mathf.Abs(c.transform.position.y - transform.position.y) > 4f) continue;
             var to = c.transform.position - transform.position;
             to.y = 0;
             float d = to.magnitude;
@@ -53,7 +65,7 @@ public class PlayerInteractor : MonoBehaviour
             float score = d - Vector3.Dot(to.normalized, transform.forward);
             if (score < bestScore) { bestScore = score; best = c; }
         }
-        if (best != null) StartCoroutine(PickUp(best));
+        return best;
     }
 
     IEnumerator PickUp(Carryable item)
@@ -69,6 +81,7 @@ public class PlayerInteractor : MonoBehaviour
         var fromPos = item.transform.position;
         var fromRot = item.transform.rotation;
         held.PickUp(transform, Vector3.zero);
+        Sfx.Play("pickup", 0.7f);
         heldCenterOffset = held.CenterOffsetLocal();
         heldSize = held.LocalSize();
         grabFrom = fromPos;
@@ -115,6 +128,8 @@ public class PlayerInteractor : MonoBehaviour
         yield return new WaitForSeconds(GrabAt);
         var forward = transform.forward;
         held.PutDown(transform.position + forward * dropDistance, Quaternion.LookRotation(forward));
+        Sfx.Play("drop", 0.8f, 1f, held.transform.position);
+        GameFeel.Puff(held.transform.position, 6);
         held = null;
         yield return new WaitForSeconds(BendTime - GrabAt);
         busy = false;

@@ -11,6 +11,9 @@ public class ScreenFader : MonoBehaviour
     {
         Instance = this;
         if (image != null) image.raycastTarget = false;
+        // fades cover every menu and HUD (the credits, at 100, still draw over them)
+        var canvas = GetComponent<Canvas>();
+        if (canvas != null) canvas.sortingOrder = Mathf.Max(canvas.sortingOrder, 90);
     }
 
     public void Set(float alpha)
