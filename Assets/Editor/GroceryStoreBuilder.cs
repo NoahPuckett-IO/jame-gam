@@ -600,10 +600,6 @@ static partial class GroceryStoreBuilder
                 new Vector3(0.01f * Scale, wireLen * 0.4f, 0.01f * Scale), wireMat);
             Box("Snapped Wire", store, top + Vector3.right * 0.6f * Scale + Vector3.up * wireLen * 0.85f,
                 new Vector3(0.01f * Scale, wireLen * 0.3f, 0.01f * Scale), wireMat);
-            // staff have coned off the sign where it came down
-            var down = GetBounds(sign.gameObject);
-            TrafficCone(store, new Vector3(down.min.x - 4f, 0, down.center.z + 2f), 20f);
-            TrafficCone(store, new Vector3(down.max.x + 4f, 0, down.center.z - 3f), -35f);
         }
     }
 

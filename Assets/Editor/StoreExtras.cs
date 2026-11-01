@@ -1,12 +1,10 @@
 using UnityEditor;
 using UnityEngine;
 
-// the finishing touches round the store made from the Kenney kits (CC0): traffic cones by the spills and the fallen
-// sign, the customer service desk and the staff door by the entrance, and speakers up on the walls
+// the finishing touches round the store made from the Kenney kits (CC0): the customer service desk and the staff
+// door by the entrance, and speakers up on the walls
 static partial class GroceryStoreBuilder
 {
-    const string FactoryFolder = "Assets/ThirdParty/KenneyConveyor";
-
     static GameObject KitModel(string path) => Usable(AssetDatabase.LoadAssetAtPath<GameObject>(path), path);
 
     // a Kenney model scaled to a real-world height in metres, turned to yaw, with box colliders, standing at floorAt
@@ -19,14 +17,6 @@ static partial class GroceryStoreBuilder
         PlaceOnFloor(go, floorAt);
         if (collide) AddBoxColliders(go);
         return go;
-    }
-
-    // an orange safety cone, about knee height on a person
-    static GameObject TrafficCone(Transform parent, Vector3 floorAt, float yaw)
-    {
-        var cone = KitProp($"{FactoryFolder}/cone.fbx", parent, 0.34f, floorAt, yaw);
-        if (cone != null) cone.name = "Traffic Cone";
-        return cone;
     }
 
     static void DressEntrance(Transform store, float left, float depth)

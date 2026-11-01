@@ -180,11 +180,8 @@ static partial class GroceryStoreBuilder
         // slippery spills from a burst carton, with a sign by each
         DrinkSpill(mess, "Milk", new Color(0.97f, 0.97f, 0.95f), new Color(0.84f, 0.85f, 0.83f), "Milk", new Vector3(x + 2f, 0, 19f), 22f, 17f, rng);
         WetFloorSign(mess, new Vector3(west + 7f, 0, 30f), 150f);
-        TrafficCone(mess, new Vector3(x + 13f, 0, 28f), 10f);
-        TrafficCone(mess, new Vector3(x + 4f, 0, 8.5f), -25f);
         DrinkSpill(mess, "Juice", new Color(1f, 0.62f, 0.12f), new Color(0.82f, 0.42f, 0.05f), "Juice", new Vector3(x + 5f, 0, -88f), 16f, 12f, rng);
         WetFloorSign(mess, new Vector3(east - 7f, 0, -78f), -30f);
-        TrafficCone(mess, new Vector3(x - 5f, 0, -79f), 40f);
     }
 
     // collision that follows the shopping cart instead of one box per part (the basket's box was solid all the way

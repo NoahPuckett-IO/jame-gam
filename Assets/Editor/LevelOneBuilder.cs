@@ -77,10 +77,6 @@ static partial class GroceryStoreBuilder
         spill.size = new Vector3(w + 1f, 0.8f, L1BarrierB - L1BarrierA - 9f);
         spill.gameObject.AddComponent<Hazard>();
         SodaSpill(level, xc, w, L1BarrierA + 5f, L1BarrierB - 5f, rng);
-        // cones round the edge of the spill, down on the floor under the climb
-        TrafficCone(level, new Vector3(xc - 14f, 0, L1BarrierA + 14f), 20f);
-        TrafficCone(level, new Vector3(xc + 13f, 0, -40f), -15f);
-        TrafficCone(level, new Vector3(xc - 12f, 0, L1BarrierB - 12f), 50f);
 
         // up across the aisle to the west
         SpoonBridge(level, new Vector3(xE + 6.3f, hall.h2, -16f), new Vector3(xW - 3f, hall.h3, -16f));

@@ -119,7 +119,6 @@ static partial class GroceryStoreBuilder
 
         WetFloorSign(root, new Vector3(hall.x - 6f, 0, zN - 6f), 200f);
         MopBucket(root, new Vector3(hall.x + 12f, 0, zN - 4f), 35f);
-        TrafficCone(root, new Vector3(hall.x + 4f, 0, zN - 10.5f), 15f);
         WetFloorSign(root, new Vector3(hall.x + 9f, 0, -zN + 3f), -20f);
     }
 
