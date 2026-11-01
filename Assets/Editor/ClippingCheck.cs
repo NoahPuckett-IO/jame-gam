@@ -7,7 +7,7 @@ using UnityEngine;
 // Things touching or resting on each other only overlap by a hair, so anything past a few centimetres is a real clip.
 static class ClippingCheck
 {
-    const float MinDepth = 0.25f;
+    const float MinDepth = 0.2f;
 
     [MenuItem("JameGam/Debug/Find Clipping Props")]
     static void Run()
@@ -35,17 +35,21 @@ static class ClippingCheck
                 found.Add((depth, Path(a.transform), Path(b.transform), a.bounds.center));
             }
         }
-        var report = $"{found.Count} clipping pairs\n" + string.Join("\n", found.OrderByDescending(f => f.depth).Take(150)
+        var report = $"{found.Count} clipping pairs\n" + string.Join("\n", found.OrderByDescending(f => f.depth).Take(800)
             .Select(f => $"{f.depth:F2}  {f.a}  <>  {f.b}  @{f.at:F1}"));
         System.IO.File.WriteAllText(System.IO.Path.Combine(Application.dataPath, "..", "DebugOut", "clipping.txt"), report);
         Debug.Log("[ClippingCheck] " + found.Count + " clipping pairs");
     }
 
-    // a prop and its own colliders count as one thing: the first object under its group (Products, Boxes, a level)
+    // a prop and its own colliders count as one thing: the outermost model it belongs to (a product, a box, a cart),
+    // or for built-up props (a cereal box, a sign) the object holding its parts. Group objects (Products, Aisle Mess,
+    // a level) don't make their contents one thing, so two products or two pieces of clutter in one group still count
     static Transform Owner(Collider c)
     {
+        var root = PrefabUtility.GetOutermostPrefabInstanceRoot(c.gameObject);
+        if (root != null) return root.transform;
         var t = c.transform;
-        while (t.parent != null && t.parent.parent != null && t.parent.parent.name != "Store") t = t.parent;
+        if (t.parent != null && t.parent.childCount <= 12 && t.parent.parent != null && t.parent.parent.name != "Store") return t.parent;
         return t;
     }
 

@@ -132,9 +132,9 @@ static partial class GroceryStoreBuilder
             Seal(root, "Crossing Wall", new Vector3(x, WallHeight / 2, crossZ + dz), new Vector3(WalkwayWidth, WallHeight, 1f));
             IceSheet(root, new Vector3(x, 0, crossZ + dz), WalkwayWidth, FreezerHeight + 3f);
         }
-        IceBarrier(root, xE, xE + fDepth, crossZ + 6.5f);
-        IceBarrier(root, xW - fDepth, xW, crossZ - 6.5f);
-        IceBarrier(root, xW - fDepth, xW, crossZ + 17f);
+        IceBarrier(root, xE, xE + fDepth - 0.9f, crossZ + 6.5f);
+        IceBarrier(root, xW - fDepth + 0.9f, xW, crossZ - 6.5f);
+        IceBarrier(root, xW - fDepth + 0.9f, xW, crossZ + 17f);
         Seal(root, "Freezer Back East", new Vector3(xE + fDepth + 0.5f, (FreezerHeight + WallHeight) / 2, 0), new Vector3(1f, WallHeight - FreezerHeight, aisleLength));
         Seal(root, "Freezer Back West", new Vector3(xW - fDepth - 0.5f, (FreezerHeight + WallHeight) / 2, 0), new Vector3(1f, WallHeight - FreezerHeight, aisleLength));
         // the backs of the freezer tops: a riser panel with overstock against it, kept clear of the route's own spots
@@ -288,15 +288,19 @@ static partial class GroceryStoreBuilder
         hazard.gameObject.AddComponent<Hazard>();
     }
 
+    // a wall of ice blocks laid like bricks across a freezer top, three rows, each block only a little turned so
+    // neighbours don't push into each other
     static void IceBarrier(Transform root, float x0, float x1, float z)
     {
         float w = x1 - x0;
         int n = Mathf.Max(1, Mathf.RoundToInt(w / 4f));
+        float cell = w / n;
         for (int r = 0; r < 3; r++)
-        for (int i = 0; i < n - (r == 2 ? 1 : 0); i++)
+        for (int i = 0; i < n - (r == 1 ? 1 : 0); i++)
         {
-            float bx = x0 + (i + 0.5f + (r == 1 ? 0.25f : r == 2 ? 0.5f : 0f)) * w / n;
-            var c = IceCube(root, new Vector3(Mathf.Min(bx, x1 - 2f), FreezerHeight + 2f + r * 3.8f, z), new Vector3(w / n * 0.98f, 3.8f, 3.4f), bob: 0);
+            float bx = x0 + (i + (r == 1 ? 1f : 0.5f)) * cell;
+            var c = IceCube(root, new Vector3(bx, FreezerHeight + 2f + r * 3.8f, z), new Vector3(cell * 0.94f, 3.8f, 3.4f), bob: 0);
+            c.transform.rotation = Quaternion.Euler(0, ((i * 7 + r * 3) % 5 - 2) * 1.2f, 0);
             c.name = "Ice Block";
         }
         Seal(root, "Ice Barrier Seal", new Vector3((x0 + x1) / 2, (FreezerHeight + WallHeight) / 2, z), new Vector3(w + 1f, WallHeight - FreezerHeight, 3.4f));
@@ -414,11 +418,18 @@ static partial class GroceryStoreBuilder
         var lifted = gate.gameObject.AddComponent<LiftedGate>();
         lifted.Setup(0.25f);
 
-        for (float wx = x - half; wx < x + half - 0.1f; wx += 4f)
+        // ice blocks stacked three high either side of the gate, fitted between the gate and the freezer doors (whose
+        // frames and handles stick out into the aisle) so none pushes into them or into each other
+        foreach (var (a, b) in new[] { (x - half + 0.8f, x - gw / 2 - 0.3f), (x + gw / 2 + 0.3f, x + half - 0.8f) })
         {
-            if (Mathf.Abs(wx + 2f - x) < gw / 2 + 0.5f) continue;
-            for (int r = 0; r < 3; r++)
-                IceCube(root, new Vector3(wx + 2f, 2f + r * 4f, wallZ), new Vector3(4f, 4f, 3f), bob: 0);
+            int cols = Mathf.Max(1, Mathf.RoundToInt((b - a) / 4f));
+            float cw = (b - a) / cols;
+            for (int k = 0; k < cols; k++)
+                for (int r = 0; r < 3; r++)
+                {
+                    var c = IceCube(root, new Vector3(a + (k + 0.5f) * cw, 2f + r * 4f, wallZ), new Vector3(cw * 0.95f, 4f, 3f), bob: 0);
+                    c.transform.rotation = Quaternion.Euler(0, ((k * 5 + r * 3) % 5 - 2) * 1.2f, 0);
+                }
         }
         Seal(root, "Seal West", new Vector3((x - half - 3f + x - gw / 2) / 2, WallHeight / 2, wallZ), new Vector3(half + 3f - gw / 2, WallHeight, 3.2f));
         Seal(root, "Seal East", new Vector3((x + gw / 2 + x + half + 3f) / 2, WallHeight / 2, wallZ), new Vector3(half + 3f - gw / 2, WallHeight, 3.2f));
@@ -724,6 +735,8 @@ static partial class GroceryStoreBuilder
         main.simulationSpace = ParticleSystemSimulationSpace.World;
         main.prewarm = true;
         main.gravityModifier = 0.03f;
+        // only the freezer aisle can see it: stop simulating it while it's off screen
+        main.cullingMode = ParticleSystemCullingMode.Pause;
         var emission = ps.emission;
         emission.rateOverTime = 180f;
         var shape = ps.shape;
@@ -733,6 +746,7 @@ static partial class GroceryStoreBuilder
         noise.enabled = true;
         noise.strength = 0.6f;
         noise.frequency = 0.2f;
+        noise.quality = ParticleSystemNoiseQuality.Medium;
         go.GetComponent<ParticleSystemRenderer>().sharedMaterial = ParticleMaterial("Snow", new Color(1f, 1f, 1f, 0.9f));
     }
 }

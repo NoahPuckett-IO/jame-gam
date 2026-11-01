@@ -18,7 +18,24 @@ static class BeanCanBuilder
     public static GameObject GetOrCreate()
     {
         var existing = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
-        if (existing != null) return existing;
+        if (existing != null)
+        {
+            // an older can built every triangle from its own three corners (504 vertices); rebuild it in place
+            var old = existing.GetComponent<MeshFilter>().sharedMesh;
+            var fresh = BuildMesh();
+            if (old != null && old.vertexCount != fresh.vertexCount)
+            {
+                old.Clear();
+                old.SetVertices(fresh.vertices);
+                old.subMeshCount = fresh.subMeshCount;
+                for (int s = 0; s < fresh.subMeshCount; s++) old.SetTriangles(fresh.GetTriangles(s), s);
+                old.SetNormals(fresh.normals);
+                old.RecalculateBounds();
+                EditorUtility.SetDirty(old);
+            }
+            Object.DestroyImmediate(fresh);
+            return existing;
+        }
 
         if (!AssetDatabase.IsValidFolder(Folder))
             AssetDatabase.CreateFolder("Assets", "Models");
@@ -63,33 +80,31 @@ static class BeanCanBuilder
             return new Vector3(Mathf.Cos(a) * r, y, Mathf.Sin(a) * r);
         }
 
-        void Tri(int sub, Vector3 a, Vector3 b, Vector3 c)
-        {
-            subs[sub].Add(verts.Count); verts.Add(a);
-            subs[sub].Add(verts.Count); verts.Add(b);
-            subs[sub].Add(verts.Count); verts.Add(c);
-        }
-
+        // flat shaded: each side panel and each end cap is flat, so its corners are shared within it but never with
+        // a neighbour (314 vertices, under the store merge's limit, where one set of corners per triangle made 504)
         for (int p = 0; p < Profile.Length - 1; p++)
         {
             var lo = Profile[p];
             var hi = Profile[p + 1];
-            int sub = lo.sub;
             for (int i = 0; i < Sides; i++)
             {
-                Vector3 a = Ring(lo.r, lo.y, i), b = Ring(lo.r, lo.y, i + 1);
-                Vector3 c = Ring(hi.r, hi.y, i + 1), d = Ring(hi.r, hi.y, i);
-                Tri(sub, a, d, c);
-                Tri(sub, a, c, b);
+                int v = verts.Count;
+                verts.Add(Ring(lo.r, lo.y, i)); verts.Add(Ring(lo.r, lo.y, i + 1));
+                verts.Add(Ring(hi.r, hi.y, i + 1)); verts.Add(Ring(hi.r, hi.y, i));
+                subs[lo.sub].AddRange(new[] { v, v + 3, v + 2, v, v + 2, v + 1 });
             }
         }
 
-        var bottom = Profile[0];
-        var top = Profile[Profile.Length - 1];
-        for (int i = 0; i < Sides; i++)
+        foreach (var (end, up) in new[] { (Profile[Profile.Length - 1], true), (Profile[0], false) })
         {
-            Tri(0, new Vector3(0, top.y, 0), Ring(top.r, top.y, i + 1), Ring(top.r, top.y, i));
-            Tri(0, new Vector3(0, bottom.y, 0), Ring(bottom.r, bottom.y, i), Ring(bottom.r, bottom.y, i + 1));
+            int centre = verts.Count;
+            verts.Add(new Vector3(0, end.y, 0));
+            for (int i = 0; i < Sides; i++) verts.Add(Ring(end.r, end.y, i));
+            for (int i = 0; i < Sides; i++)
+            {
+                int a = centre + 1 + i, b = centre + 1 + (i + 1) % Sides;
+                subs[0].AddRange(up ? new[] { centre, b, a } : new[] { centre, a, b });
+            }
         }
 
         var mesh = new Mesh { name = "BeanCan" };

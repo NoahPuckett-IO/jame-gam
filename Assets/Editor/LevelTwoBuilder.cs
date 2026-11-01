@@ -119,6 +119,7 @@ static partial class GroceryStoreBuilder
 
         WetFloorSign(root, new Vector3(hall.x - 6f, 0, zN - 6f), 200f);
         MopBucket(root, new Vector3(hall.x + 12f, 0, zN - 4f), 35f);
+        TrafficCone(root, new Vector3(hall.x + 4f, 0, zN - 10.5f), 15f);
         WetFloorSign(root, new Vector3(hall.x + 9f, 0, -zN + 3f), -20f);
     }
 
@@ -638,39 +639,11 @@ static partial class GroceryStoreBuilder
         return cautionBoard = mesh;
     }
 
-    // the cleaner's yellow mop bucket on castors, grey water in it and the wringer on one side; one box collider
+    // the cleaner's bucket (Kenney survival kit), left out by the spill
     static void MopBucket(Transform parent, Vector3 floorAt, float yaw)
     {
-        var root = new GameObject("Mop Bucket").transform;
-        root.SetParent(parent);
-        root.SetPositionAndRotation(floorAt, Quaternion.Euler(0, yaw, 0));
-        var yellow = GetMaterial("Caution Yellow", new Color(1f, 0.82f, 0.05f));
-        var grey = GetMaterial("Bucket Grey", new Color(0.32f, 0.33f, 0.35f));
-        var water = GetMaterial("Mop Water", new Color(0.36f, 0.4f, 0.38f));
-        water.SetFloat("_Smoothness", 0.85f);
-        const float r = 4.6f, h = 6.4f, wheel = 0.9f;
-        void Part(PrimitiveType type, string name, Vector3 local, Vector3 scale, Material m, Vector3 euler = default)
-        {
-            var g = GameObject.CreatePrimitive(type);
-            g.name = name;
-            g.transform.SetParent(root, false);
-            g.transform.localPosition = local;
-            g.transform.localRotation = Quaternion.Euler(euler);
-            g.transform.localScale = scale;
-            g.GetComponent<Renderer>().sharedMaterial = m;
-            Object.DestroyImmediate(g.GetComponent<Collider>());
-            g.isStatic = true;
-        }
-        Part(PrimitiveType.Cylinder, "Bucket", new Vector3(0, wheel + h / 2, 0), new Vector3(r * 2, h / 2, r * 2), yellow);
-        Part(PrimitiveType.Cylinder, "Rim", new Vector3(0, wheel + h, 0), new Vector3(r * 2 + 0.4f, 0.15f, r * 2 + 0.4f), yellow);
-        Part(PrimitiveType.Cylinder, "Water", new Vector3(0, wheel + h - 0.5f, 0), new Vector3(r * 2 - 0.5f, 0.05f, r * 2 - 0.5f), water);
-        foreach (var (wx, wz) in new[] { (-1, -1), (-1, 1), (1, -1), (1, 1) })
-            Part(PrimitiveType.Cylinder, "Castor", new Vector3(wx * r * 0.65f, wheel / 2, wz * r * 0.65f), new Vector3(wheel, 0.3f, wheel), grey, new Vector3(0, 0, 90));
-        Part(PrimitiveType.Cube, "Wringer", new Vector3(0, wheel + h + 1.4f, r * 0.55f), new Vector3(r * 1.3f, 2.8f, r * 0.7f), grey);
-        Part(PrimitiveType.Cube, "Wringer Lever", new Vector3(r * 0.6f, wheel + h + 4.2f, r * 0.55f), new Vector3(0.35f, 5.5f, 0.35f), grey, new Vector3(0, 0, -12));
-        var col = root.gameObject.AddComponent<BoxCollider>();
-        col.center = new Vector3(0, (wheel + h + 2.8f) / 2, 0);
-        col.size = new Vector3(r * 2, wheel + h + 2.8f, r * 2);
+        var bucket = KitProp($"{SurvivalFolder}/bucket.fbx", parent, 0.36f, floorAt, yaw);
+        if (bucket != null) bucket.name = "Mop Bucket";
     }
 
     // a push broom dropped flat on the floor, bristles down, from its head at `head` along `along`

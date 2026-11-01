@@ -17,7 +17,8 @@ using UnityEngine.Rendering;
 public static class StoreMeshMerge
 {
     const float Cell = 48f;
-    const int MaxSourceVerts = 300;
+    // just over the bean can (314 vertices), which is on every canned-goods shelf: hundreds of cans, three draws each
+    const int MaxSourceVerts = 320;
 
     // what the merge hid and what it made, for the Editor checks
     public static readonly List<MeshRenderer> Hidden = new List<MeshRenderer>();
@@ -93,8 +94,11 @@ public static class StoreMeshMerge
         if (mesh == null || !mesh.isReadable || mesh.vertexCount > MaxSourceVerts || mesh.lodCount > 1) return false;
         if (r.GetComponent<TextMesh>() != null) return false;
         if (r.transform.localToWorldMatrix.determinant < 0) return false;
+        // see-through materials stay apart so they keep sorting back to front, except the grime decals: flat quads lying
+        // on the floor, walls and ceiling that are drawn the same in any order
+        bool decal = group.name == "Grime";
         foreach (var m in r.sharedMaterials)
-            if (m == null || m.renderQueue >= (int)RenderQueue.AlphaTest) return false;
+            if (m == null || (m.renderQueue >= (int)RenderQueue.AlphaTest && !decal)) return false;
         for (var t = r.transform; t != group.parent; t = t.parent)
         {
             if (referenced.Contains(t)) return false;

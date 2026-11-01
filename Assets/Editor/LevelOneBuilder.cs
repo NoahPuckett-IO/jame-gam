@@ -77,6 +77,10 @@ static partial class GroceryStoreBuilder
         spill.size = new Vector3(w + 1f, 0.8f, L1BarrierB - L1BarrierA - 9f);
         spill.gameObject.AddComponent<Hazard>();
         SodaSpill(level, xc, w, L1BarrierA + 5f, L1BarrierB - 5f, rng);
+        // cones round the edge of the spill, down on the floor under the climb
+        TrafficCone(level, new Vector3(xc - 14f, 0, L1BarrierA + 14f), 20f);
+        TrafficCone(level, new Vector3(xc + 13f, 0, -40f), -15f);
+        TrafficCone(level, new Vector3(xc - 12f, 0, L1BarrierB - 12f), 50f);
 
         // up across the aisle to the west
         SpoonBridge(level, new Vector3(xE + 6.3f, hall.h2, -16f), new Vector3(xW - 3f, hall.h3, -16f));
@@ -343,7 +347,7 @@ static partial class GroceryStoreBuilder
             : $"{MatFolder}/CerealArt/Cereal_{style}_{part}.mat";
         var tex = part switch
         {
-            CerealPart.Front => CerealArt.Front(style, s.art),
+            CerealPart.Front => CerealArt.Front(style, s.art, new CerealArt.Print { name = s.brand, tag = s.tag, nameInk = NameInk(s.art) }),
             CerealPart.Side => CerealArt.Side(style, s.art),
             CerealPart.SideB => CerealArt.SideB(style, s.art),
             CerealPart.Top => CerealArt.Top(style, s.art),
@@ -362,6 +366,13 @@ static partial class GroceryStoreBuilder
         return mat;
     }
 
+    // the name sits on the art's label panel (the accent colour, lightened); white vanished on the pale ones
+    static Color NameInk(CerealArt.Brand art)
+    {
+        var label = Color.Lerp(art.accent, Color.white, 0.25f);
+        return label.grayscale > 0.6f ? art.deep : Color.white;
+    }
+
     static GameObject CerealBox(Transform parent, int style, float sizeScale = 1f)
     {
         style = ((style % Cereals.Length) + Cereals.Length) % Cereals.Length;
@@ -371,9 +382,6 @@ static partial class GroceryStoreBuilder
         float W = CerealW * sizeScale, H = CerealH * sizeScale, D = CerealD * sizeScale;
         Box("Box", root.transform, Vector3.zero, new Vector3(W, H, D), CerealMat(style, CerealPart.Body));
         var frontMat = CerealMat(style, CerealPart.Front);
-        // the name sits on the art's label panel (the accent colour, lightened); white vanished on the pale ones
-        var label = Color.Lerp(s.art.accent, Color.white, 0.25f);
-        var nameInk = label.grayscale > 0.6f ? s.art.deep : Color.white;
         ArtQuad(root.transform, "Nutrition Side", new Vector3(W / 2 + 0.02f, 0, 0), Quaternion.Euler(0, -90, 0), new Vector2(D, H), CerealMat(style, CerealPart.Side));
         ArtQuad(root.transform, "Ingredients Side", new Vector3(-W / 2 - 0.02f, 0, 0), Quaternion.Euler(0, 90, 0), new Vector2(D, H), CerealMat(style, CerealPart.SideB));
         ArtQuad(root.transform, "Top Flaps", new Vector3(0, H / 2 + 0.02f, 0), Quaternion.Euler(90, 0, 0), new Vector2(W, D), CerealMat(style, CerealPart.Top));
@@ -387,14 +395,6 @@ static partial class GroceryStoreBuilder
             q.transform.localScale = new Vector3(W, H, 1);
             q.GetComponent<Renderer>().sharedMaterial = frontMat;
             Object.DestroyImmediate(q.GetComponent<Collider>());
-
-            float yaw = face < 0 ? 0 : 180;
-            var outward = new Vector3(0, 0, face * (D / 2 + 0.06f));
-            var right = face < 0 ? 1f : -1f;
-            MakeText(root.transform, new Vector3(0, H * 0.3f, 0) + outward, yaw, s.brand, W * 0.8f, H * 0.2f, nameInk, lit: true);
-            MakeText(root.transform, new Vector3(0, H * 0.165f, 0) + outward, yaw, s.tag, W * 0.6f, H * 0.035f, new Color(1f, 1f, 0.85f), lit: true);
-            MakeText(root.transform, new Vector3(right * W * 0.324f, H * 0.083f, 0) + outward, yaw, "NEW!", W * 0.16f, H * 0.04f, Color.white, lit: true);
-            MakeText(root.transform, new Vector3(0, -H * 0.462f, 0) + outward, yaw, "FAMILY SIZE  •  NET WT 18 OZ (510g)", W * 0.8f, H * 0.03f, Color.white, lit: true);
         }
         foreach (var t in root.GetComponentsInChildren<Transform>()) t.gameObject.isStatic = false;
         return root;

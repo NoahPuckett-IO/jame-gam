@@ -87,9 +87,8 @@ static partial class GroceryStoreBuilder
                 var t = produce[rng.Next(produce.Count)];
                 var p = SpawnProduct(t, mess, R(0f, 360f), t.size / Mathf.Max(t.bounds.x, t.bounds.y, t.bounds.z));
                 if (rng.NextDouble() < 0.5) p.transform.rotation = Quaternion.Euler(R(40f, 100f), 0, 0) * p.transform.rotation;
-                PlaceOnFloor(p, center + new Vector3(R(-spreadX, spreadX), 0, R(-spreadZ, spreadZ)));
                 AddBoxColliders(p);
-                SettleLater(p);
+                if (PlaceClear(p, () => center + new Vector3(R(-spreadX, spreadX), 0, R(-spreadZ, spreadZ)))) SettleLater(p);
             }
         }
 
@@ -117,16 +116,16 @@ static partial class GroceryStoreBuilder
             AddBoxColliders(g);
             return g;
         }
-        // fruit on a crate's lid, a 3 by 2 grid of places so no two pieces sit inside each other
+        // fruit on a crate's lid, one to each quarter so no two pieces sit inside each other
         void Heap(GameObject under, int count)
         {
             var b = GetBounds(under);
-            for (int i = 0; i < count && i < 6 && produce.Count > 0; i++)
+            for (int i = 0; i < count && i < 4 && produce.Count > 0; i++)
             {
                 var t = produce[rng.Next(Mathf.Min(7, produce.Count))];
                 var p = SpawnProduct(t, mess, R(0f, 360f), t.size / Mathf.Max(t.bounds.x, t.bounds.y, t.bounds.z));
-                var cell = new Vector3((i % 3 - 1) * b.size.x * 0.28f, 0, (i / 3 - 0.5f) * b.size.z * 0.4f);
-                PlaceOnFloor(p, new Vector3(b.center.x + cell.x + R(-0.2f, 0.2f), b.max.y, b.center.z + cell.z + R(-0.2f, 0.2f)));
+                var cell = new Vector3((i % 2 - 0.5f) * b.size.x * 0.5f, 0, (i / 2 - 0.5f) * b.size.z * 0.5f);
+                PlaceOnFloor(p, new Vector3(b.center.x + cell.x + R(-0.1f, 0.1f), b.max.y, b.center.z + cell.z + R(-0.1f, 0.1f)));
                 AddBoxColliders(p);
             }
         }
@@ -173,17 +172,19 @@ static partial class GroceryStoreBuilder
             {
                 var t = oranges[0];
                 var o = SpawnProduct(t, mess, R(0f, 360f), t.size / Mathf.Max(t.bounds.x, t.bounds.y, t.bounds.z));
-                PlaceOnFloor(o, new Vector3(east - 12.5f - R(0f, 7f), 0, -16f + R(-5f, 5f)));
                 AddBoxColliders(o);
-                SettleLater(o);
+                if (PlaceClear(o, () => new Vector3(east - 12.5f - R(0f, 7f), 0, -16f + R(-5f, 5f)))) SettleLater(o);
             }
         }
 
         // slippery spills from a burst carton, with a sign by each
         DrinkSpill(mess, "Milk", new Color(0.97f, 0.97f, 0.95f), new Color(0.84f, 0.85f, 0.83f), "Milk", new Vector3(x + 2f, 0, 19f), 22f, 17f, rng);
         WetFloorSign(mess, new Vector3(west + 7f, 0, 30f), 150f);
+        TrafficCone(mess, new Vector3(x + 13f, 0, 28f), 10f);
+        TrafficCone(mess, new Vector3(x + 4f, 0, 8.5f), -25f);
         DrinkSpill(mess, "Juice", new Color(1f, 0.62f, 0.12f), new Color(0.82f, 0.42f, 0.05f), "Juice", new Vector3(x + 5f, 0, -88f), 16f, 12f, rng);
         WetFloorSign(mess, new Vector3(east - 7f, 0, -78f), -30f);
+        TrafficCone(mess, new Vector3(x - 5f, 0, -79f), 40f);
     }
 
     // collision that follows the shopping cart instead of one box per part (the basket's box was solid all the way

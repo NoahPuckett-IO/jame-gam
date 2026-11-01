@@ -15,7 +15,15 @@ static class CerealArt
         public Color pieceColor;
     }
 
-    public static Texture2D Front(int index, Brand b) => Get($"{Folder}/Front_{index}.png", () => PaintFront(b, index));
+    // the printing on a box front. It's painted into the art; each line used to be its own TextMesh, eight to a box and
+    // about seven hundred in the store, every one its own draw call
+    public struct Print
+    {
+        public string name, tag;
+        public Color nameInk;
+    }
+
+    public static Texture2D Front(int index, Brand b, Print print) => Get($"{Folder}/Front_{index}.png", () => PaintFront(b, index, print));
     public static Texture2D Side(int index, Brand b) => Get($"{Folder}/Side_{index}.png", () => PaintSide(b, index));
     public static Texture2D SideB(int index, Brand b) => Get($"{Folder}/SideB_{index}.png", () => PaintSideB(b, index));
     public static Texture2D Top(int index, Brand b) => Get($"{Folder}/Top_{index}.png", () => PaintTop(b));
@@ -138,7 +146,7 @@ static class CerealArt
         }
     }
 
-    static Texture2D PaintFront(Brand b, int seed)
+    static Texture2D PaintFront(Brand b, int seed, Print print)
     {
         const int W = 512, H = 720;
         var c = new Canvas(W, H);
@@ -185,8 +193,91 @@ static class CerealArt
         c.Star(W - 90, H - 300, 70, 14, new Color(1f, 0.9f, 0.15f));
         c.Star(W - 90, H - 300, 58, 14, new Color(0.95f, 0.2f, 0.15f));
         c.Rect(0, 0, W, 54, new Color(0, 0, 0, 0.35f));
+
+        // where the TextMesh lines sat on the box: the name on the label panel, the tagline just under it (it used to
+        // straddle the panel's edge), NEW! on the star
+        // and the weight along the dark band at the bottom
+        Text(c, print.name, W * 0.5f, H * 0.8f, W * 0.8f, H * 0.2f, print.nameInk);
+        Text(c, print.tag, W * 0.5f, H * 0.635f, W * 0.6f, H * 0.035f, new Color(1f, 1f, 0.85f));
+        Text(c, "NEW!", W * 0.824f, H * 0.583f, W * 0.16f, H * 0.04f, Color.white);
+        Text(c, "FAMILY SIZE  •  NET WT 18 OZ (510g)", W * 0.5f, H * 0.038f, W * 0.8f, H * 0.03f, Color.white);
         return c.ToTexture();
     }
+
+    // Bebas Neue lettering painted into a canvas, centred on (cx, cy) and as large as fits in maxW by maxH, laid out
+    // exactly as the store's TextMesh signs are: a throwaway TextMesh is rendered white on black by an orthographic
+    // camera at twice the size, and the result (shrunk back down) is how much ink each pixel gets
+    static void Text(Canvas c, string text, float cx, float cy, float maxW, float maxH, Color color)
+    {
+        const int size = 96, supersample = 2;
+        var font = AssetDatabase.LoadAssetAtPath<Font>("Assets/Fonts/BebasNeue-Regular.ttf");
+        var mat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/SignText_BebasNeue-Regular.mat");
+        if (font == null || mat == null || string.IsNullOrEmpty(text)) return;
+        int pw = Mathf.CeilToInt(maxW), ph = Mathf.CeilToInt(maxH);
+        var origin = new Vector3(0, -9000, 0);
+
+        var go = new GameObject("Print") { hideFlags = HideFlags.HideAndDontSave };
+        go.transform.position = origin;
+        var tm = go.AddComponent<TextMesh>();
+        tm.font = font;
+        tm.text = text;
+        tm.fontSize = size;
+        tm.lineSpacing = 0.9f;
+        tm.anchor = TextAnchor.MiddleCenter;
+        tm.alignment = TextAlignment.Center;
+        tm.color = Color.white;
+        go.GetComponent<MeshRenderer>().sharedMaterial = mat;
+        font.RequestCharactersInTexture(text, size);
+        mat.mainTexture = font.material.mainTexture;
+        var lines = text.Split('\n');
+        float widest = 0;
+        foreach (var line in lines)
+        {
+            float w = 0;
+            foreach (char ch in line) if (font.GetCharacterInfo(ch, out var info, size)) w += info.advance;
+            widest = Mathf.Max(widest, w);
+        }
+        tm.characterSize = Mathf.Min(pw / Mathf.Max(widest * 0.1f, 0.01f), ph / (lines.Length * size * 0.9f * 0.1f));
+
+        var camGo = new GameObject("Print Camera") { hideFlags = HideFlags.HideAndDontSave };
+        var cam = camGo.AddComponent<Camera>();
+        cam.orthographic = true;
+        cam.orthographicSize = ph / 2f;
+        cam.nearClipPlane = 1f;
+        cam.farClipPlane = 20f;
+        cam.clearFlags = CameraClearFlags.SolidColor;
+        cam.backgroundColor = new Color(0, 0, 0, 0);
+        camGo.transform.SetPositionAndRotation(origin + Vector3.back * 10f, Quaternion.identity);
+        var rt = new RenderTexture(pw * supersample, ph * supersample, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
+        cam.targetTexture = rt;
+        cam.aspect = (float)pw / ph;
+        cam.Render();
+        var prev = RenderTexture.active;
+        RenderTexture.active = rt;
+        var shot = new Texture2D(rt.width, rt.height, TextureFormat.RGBA32, false, true);
+        shot.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+        shot.Apply();
+        RenderTexture.active = prev;
+        cam.targetTexture = null;
+
+        var px = shot.GetPixels();
+        int x0 = Mathf.RoundToInt(cx - pw / 2f), y0 = Mathf.RoundToInt(cy - ph / 2f);
+        for (int y = 0; y < ph; y++)
+        for (int x = 0; x < pw; x++)
+        {
+            float ink = 0f;
+            for (int sy = 0; sy < supersample; sy++)
+            for (int sx = 0; sx < supersample; sx++)
+                ink += px[(y * supersample + sy) * rt.width + x * supersample + sx].r;
+            ink /= supersample * supersample;
+            if (ink > 0.004f) c.Blend(x0 + x, y0 + y, new Color(color.r, color.g, color.b, color.a * Mathf.Clamp01(ink)));
+        }
+        Object.DestroyImmediate(shot);
+        Object.DestroyImmediate(rt);
+        Object.DestroyImmediate(camGo);
+        Object.DestroyImmediate(go);
+    }
+
 
     static Texture2D PaintSideB(Brand b, int seed)
     {

@@ -127,6 +127,7 @@ static partial class GroceryStoreBuilder
         BuildEndcaps(store.transform, aisles, shelf, aisleLength);
         BuildCheckout(store.transform, left, depth);
         DressCheckout(store.transform, left, right, depth);
+        DressEntrance(store.transform, left, depth);
 
         float coolersFrom = left + CheckoutWidth;
         BuildCoolerRun(store.transform, coolersFrom, right, depth / 2, +1, CoolerDrinks, "DAIRY & DRINKS", new Color(0.1f, 0.35f, 0.85f), 1);
@@ -204,6 +205,7 @@ static partial class GroceryStoreBuilder
         TuneFinishes();
         BuildTutorialRoom(store.transform);
         AddPickupOutlines(store.transform);
+        LimitDoorShadows(store.transform, left + CheckoutWidth + 0.5f * Scale);
 
         MenuBuilder.Build(controller, spawn);
         BuildMusic();
@@ -218,6 +220,22 @@ static partial class GroceryStoreBuilder
 
         EditorSceneManager.MarkSceneDirty(player.scene);
         Selection.activeGameObject = player;
+    }
+
+    // The sunlight through the doors is the only light with shadows, and its cone reaches the whole store, so every
+    // shelf, can and box was drawn into its shadow map each frame: a quarter to half of all draw calls. Past the
+    // checkouts the light is so weak that rendering every view with and without its shadows changed nothing visible,
+    // so only things starting west of frontX (the checkouts, the doorway, the walls) still cast shadows from it.
+    static void LimitDoorShadows(Transform store, float frontX)
+    {
+        int off = 0;
+        foreach (var r in store.GetComponentsInChildren<Renderer>(true))
+        {
+            if (r.shadowCastingMode == UnityEngine.Rendering.ShadowCastingMode.Off || r.bounds.min.x < frontX) continue;
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            off++;
+        }
+        Debug.Log($"[GroceryStoreBuilder] {off} renderers past the checkouts no longer draw into the door light's shadow map");
     }
 
     static void BuildMusic()
@@ -449,7 +467,7 @@ static partial class GroceryStoreBuilder
                 }
             }
             var strayRng = new System.Random(4);
-            foreach (var spot in new[] { new Vector2(0.2f, -0.6f), new Vector2(0.15f, 3.2f), new Vector2(0.9f, -6.6f), new Vector2(0.6f, 6.4f) })
+            foreach (var spot in new[] { new Vector2(0.2f, -0.6f), new Vector2(0.15f, 3.2f), new Vector2(0.9f, -6.6f), new Vector2(0.42f, 6.0f) })
             {
                 var stray = PlaceProp(cart, area, 1.05f, 1.1f, alongX: strayRng.Next(2) == 0,
                     new Vector3(left + CheckoutWidth * spot.x, 0, spot.y * Scale));
@@ -582,6 +600,10 @@ static partial class GroceryStoreBuilder
                 new Vector3(0.01f * Scale, wireLen * 0.4f, 0.01f * Scale), wireMat);
             Box("Snapped Wire", store, top + Vector3.right * 0.6f * Scale + Vector3.up * wireLen * 0.85f,
                 new Vector3(0.01f * Scale, wireLen * 0.3f, 0.01f * Scale), wireMat);
+            // staff have coned off the sign where it came down
+            var down = GetBounds(sign.gameObject);
+            TrafficCone(store, new Vector3(down.min.x - 4f, 0, down.center.z + 2f), 20f);
+            TrafficCone(store, new Vector3(down.max.x + 4f, 0, down.center.z - 3f), -35f);
         }
     }
 
@@ -915,9 +937,11 @@ static partial class GroceryStoreBuilder
                     // knocked over: only squat upright things (cans, jars) whose lying length still fits their slot. A dish on
                     // its edge looks placed, and a tall bottle lying down pokes through its neighbours
                     bool tipped = rng.NextDouble() < 0.025 && bnd.y * s < w * 1.2f && bnd.y > Mathf.Max(bnd.x, bnd.z) * 0.9f;
-                    // the little random twist mustn't swing a deep item's corners into the row behind or the other side
+                    // the little random twist mustn't swing a deep item's corners into the row behind or the other side, nor into
+                    // the facings either side of it (half the depth times the sine is how far a corner swings sideways)
                     float slack = boardDepth - rows * d - rows * gap;
-                    float twist = Mathf.Min(9f, Mathf.Asin(Mathf.Clamp01(slack / Mathf.Max(w, 0.01f))) * Mathf.Rad2Deg);
+                    float twist = Mathf.Min(9f, Mathf.Asin(Mathf.Clamp01(slack / Mathf.Max(w, 0.01f))) * Mathf.Rad2Deg,
+                        Mathf.Asin(Mathf.Clamp01(0.2f / Mathf.Max(d, 0.01f))) * Mathf.Rad2Deg);
                     p.transform.rotation = Quaternion.Euler(tipped ? 90 : 0, rand(-twist, twist), 0) * p.transform.rotation;
                     PlaceOnFloor(p, new Vector3(px, y, zc));
                     AddBoxColliders(p);
@@ -996,24 +1020,20 @@ static partial class GroceryStoreBuilder
             BoxPile(pile, ax - shelf.gondolaDepth / 2, ax + shelf.gondolaDepth / 2, zMid - spanZ / 2, zMid + spanZ / 2, rng, types);
             if (types.Count == 0) continue;
 
-            GameObject Item(Vector3 at, bool tumble)
+            // groceries spilled on the floor either side of the pile, each on a clear spot so none sits inside another
+            Vector3 Spot()
+            {
+                float sideX = rng.Next(2) == 0 ? -1 : 1;
+                return new Vector3(ax + sideX * (shelf.gondolaDepth / 2 + Rand(0f, 0.9f) * Scale), 0, zMid + Rand(-0.45f, 0.45f) * spanZ);
+            }
+            for (int k = rng.Next(10, 18); k > 0; k--)
             {
                 var t = types[rng.Next(types.Count)];
                 float s = t.size / Mathf.Max(t.bounds.x, t.bounds.y, t.bounds.z);
                 var p = SpawnProduct(t, pile, t.yaw + Rand(0f, 360f), s);
-                if (tumble) p.transform.rotation = Quaternion.Euler(Rand(0f, 360f), Rand(0f, 360f), Rand(0f, 360f)) * p.transform.rotation;
-                PlaceOnFloor(p, at);
+                if (rng.NextDouble() < 0.7) p.transform.rotation = Quaternion.Euler(Rand(0f, 360f), Rand(0f, 360f), Rand(0f, 360f)) * p.transform.rotation;
                 AddBoxColliders(p);
-                if (at.y <= 0.01f) SettleLater(p);
-                return p;
-            }
-
-            for (int k = rng.Next(10, 18); k > 0; k--)
-            {
-                float sideX = rng.Next(2) == 0 ? -1 : 1;
-                float x = ax + sideX * (shelf.gondolaDepth / 2 + Rand(0f, 0.9f) * Scale);
-                float z = zMid + Rand(-0.45f, 0.45f) * spanZ;
-                Item(new Vector3(x, 0, z), tumble: rng.NextDouble() < 0.7);
+                if (PlaceClear(p, Spot)) SettleLater(p);
             }
         }
     }

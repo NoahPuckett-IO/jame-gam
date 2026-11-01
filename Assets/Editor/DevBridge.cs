@@ -128,6 +128,7 @@ static class DevBridge
             case "seals": Seals(); break;
             case "bg": PlayingOnly(); Application.runInBackground = true; break;
             case "parts": Parts(arg); break;
+            case "sweep": Sweep(arg); break;
             default: throw new System.Exception("unknown command");
         }
     }
@@ -406,6 +407,47 @@ static class DevBridge
         Render("models_low", c + new Vector3(0, 0.5f, -x * 0.62f - 3f) + Vector3.down * 1.5f, c + Vector3.down * 1.5f, 40f);
         File.WriteAllText(System.IO.Path.Combine(Root, "models.txt"), sb.ToString());
         Object.DestroyImmediate(root);
+    }
+
+    // sweep [file]: renders the views in DebugOut/sweep.txt (same lines as shots.txt, world positions only) four to a
+    // picture, 2 by 2 in list order (top left, top right, bottom left, bottom right), into sweep_1.jpg, sweep_2.jpg..., for combing the
+    // store for props that clip or float without opening one picture per view
+    static void Sweep(string file)
+    {
+        var path = Path.Combine(Root, string.IsNullOrEmpty(file) ? "sweep.txt" : file);
+        var views = File.ReadAllLines(path).Select(l => l.Split(new[] { ' ' }, System.StringSplitOptions.RemoveEmptyEntries))
+            .Where(p => p.Length >= 7 && !p[0].StartsWith("#")).ToList();
+        const int w = 640, h = 360;
+        for (int sheet = 0; sheet * 4 < views.Count; sheet++)
+        {
+            var tex = new Texture2D(w * 2, h * 2, TextureFormat.RGB24, false);
+            for (int k = 0; k < 4 && sheet * 4 + k < views.Count; k++)
+            {
+                var p = views[sheet * 4 + k];
+                var eye = new Vector3(F(p[1]), F(p[2]), F(p[3]));
+                var target = new Vector3(F(p[4]), F(p[5]), F(p[6]));
+                var go = new GameObject("Sweep Camera") { hideFlags = HideFlags.HideAndDontSave };
+                var cam = go.AddComponent<Camera>();
+                cam.fieldOfView = p.Length > 7 ? F(p[7]) : 60f;
+                cam.nearClipPlane = 0.1f;
+                cam.farClipPlane = 3000f;
+                cam.clearFlags = CameraClearFlags.SolidColor;
+                cam.backgroundColor = new Color(0.2f, 0.22f, 0.25f);
+                go.transform.SetPositionAndRotation(eye, Quaternion.LookRotation(target - eye));
+                var rt = new RenderTexture(w, h, 24);
+                cam.targetTexture = rt;
+                cam.Render();
+                RenderTexture.active = rt;
+                tex.ReadPixels(new Rect(0, 0, w, h), (k % 2) * w, (1 - k / 2) * h);
+                RenderTexture.active = null;
+                cam.targetTexture = null;
+                Object.DestroyImmediate(rt);
+                Object.DestroyImmediate(go);
+            }
+            tex.Apply();
+            File.WriteAllBytes(Path.Combine(Root, $"sweep_{sheet + 1}.jpg"), tex.EncodeToJPG(80));
+            Object.DestroyImmediate(tex);
+        }
     }
 
     static void Render(string name, Vector3 eye, Vector3 target, float fov)

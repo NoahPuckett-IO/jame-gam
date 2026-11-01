@@ -225,8 +225,35 @@ static partial class GroceryStoreBuilder
                 go.transform.SetPositionAndRotation(kv.Value.pos, kv.Value.rot);
             else kept++;
         }
+        // a tumbled item can come to rest with a corner pushed down through the floor's top (or have started that way
+        // and been left out of the drop); lift it back onto it
+        foreach (var go in items)
+        {
+            if (go == null) continue;
+            float under = GetBounds(go).min.y;
+            if (under < -0.02f) go.transform.position += Vector3.up * -under;
+        }
         settleForced.Clear();
         Debug.Log($"[GroceryStoreBuilder] Settled {kept} of {items.Count} scattered items with physics.");
+    }
+
+    // puts a loose prop on the floor at a spot from pick() where it doesn't sink into anything already there, trying a
+    // few spots; gives up and removes it when all are taken. The prop needs its colliders already. Invisible walls,
+    // triggers and the floor don't count as in the way
+    static bool PlaceClear(GameObject go, System.Func<Vector3> pick, int tries = 8)
+    {
+        for (int i = 0; i < tries; i++)
+        {
+            PlaceOnFloor(go, pick());
+            Physics.SyncTransforms();
+            var b = GetBounds(go);
+            bool blocked = false;
+            foreach (var c in Physics.OverlapBox(b.center, b.extents * 0.85f, Quaternion.identity, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                if (!c.transform.IsChildOf(go.transform) && c.name != "Floor") { blocked = true; break; }
+            if (!blocked) return true;
+        }
+        Object.DestroyImmediate(go);
+        return false;
     }
 
     static Rigidbody Kinematic(GameObject go)

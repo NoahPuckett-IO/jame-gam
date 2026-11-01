@@ -81,7 +81,7 @@ static partial class GroceryStoreBuilder
         ("Cereal 0 Body Color", 0.2f, 0f), ("Cereal 1 Body Color", 0.2f, 0f), ("Cereal 2 Body Color", 0.2f, 0f),
         ("Cereal 3 Body Color", 0.2f, 0f), ("Cereal 4 Body Color", 0.2f, 0f), ("Cereal 5 Body Color", 0.2f, 0f),
         ("Cracker", 0.06f, 0f), ("Cracker Dots", 0.04f, 0f), ("Sponge Yellow", 0.03f, 0f), ("Sponge Green", 0.03f, 0f),
-        ("Mop Strands", 0.03f, 0f), ("Mop Handle", 0.4f, 0f), ("Mop Socket", 0.35f, 0f), ("Bucket Grey", 0.3f, 0f),
+        ("Mop Strands", 0.03f, 0f), ("Mop Handle", 0.4f, 0f), ("Mop Socket", 0.35f, 0f),
         ("Broom Handle", 0.2f, 0f), ("Broom Block", 0.35f, 0f), ("Caution Black", 0.25f, 0f), ("Ruler", 0.28f, 0f), ("Caution Yellow", 0.35f, 0f),
         ("Spot Ring", 0.15f, 0f), ("Popsicle Wood", 0.1f, 0f), ("Chopstick Wood", 0.15f, 0f), ("Toothpick Wood", 0.1f, 0f),
         ("Wooden Spoon", 0.18f, 0f), ("Floss", 0.3f, 0f), ("Wire", 0.35f, 0f), ("Ladder Hook", 0.35f, 0.3f),
