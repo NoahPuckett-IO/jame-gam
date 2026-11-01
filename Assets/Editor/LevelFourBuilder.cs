@@ -49,7 +49,7 @@ static partial class GroceryStoreBuilder
         var rng = new System.Random(404);
         var debris = Measure(Stock[2].Concat(Stock[3]).ToArray());
         Physics.SyncTransforms();
-        for (int i = 0; i < 40 && debris.Count > 0; i++)
+        for (int i = 0; i < 20 && debris.Count > 0; i++)
         {
             var t = debris[rng.Next(debris.Count)];
             var p = SpawnProduct(t, root, rng.Next(360), t.size / Mathf.Max(t.bounds.x, t.bounds.y, t.bounds.z));
@@ -99,11 +99,12 @@ static partial class GroceryStoreBuilder
         {
             var c = PlaceProp(cart, mess, 1.05f, 1.1f, alongX: false, new Vector3(x - 8f, 0, 78f));
             c.name = "Tipped Cart";
+            FitCartColliders(c);
             c.transform.RotateAround(GetBounds(c).center, Vector3.forward, -90f);
             c.transform.Rotate(0, 8f, 0, Space.World);
             var b = GetBounds(c);
             PlaceOnFloor(c, new Vector3(west + b.size.x / 2 + 2.6f, 0, 78f));
-            Spill(new Vector3(GetBounds(c).max.x + 4f, 0, 78f), 3.5f, 8f, 16);
+            Spill(new Vector3(GetBounds(c).max.x + 4f, 0, 78f), 3.5f, 8f, 9);
         }
 
         // produce crates on the east side, one stacked, with fruit heaped on top
@@ -136,7 +137,7 @@ static partial class GroceryStoreBuilder
             var top = Crate(new Vector3(east - 5.4f, GetBounds(a).max.y, 58.6f), 4.6f);
             Heap(top, 6);
             Heap(b, 4);
-            Spill(new Vector3(east - 11f, 0, 57f), 2.5f, 4f, 6);
+            Spill(new Vector3(east - 11f, 0, 57f), 2.5f, 4f, 3);
 
             var lone = Crate(new Vector3(west + 5.6f, 0, -72f), 5.4f);
             Heap(lone, 5);
@@ -146,7 +147,7 @@ static partial class GroceryStoreBuilder
         // whole watermelons rolled into the middle
         var melon = Measure(new[] { ("k:watermelon", 0.32f) });
         if (melon.Count > 0)
-            foreach (var at in new[] { new Vector3(x - 6f, 0, 49f), new Vector3(x - 1.5f, 0, 47f), new Vector3(west + 15f, 0, -69f) })
+            foreach (var at in new[] { new Vector3(x - 4f, 0, 48f), new Vector3(west + 15f, 0, -69f) })
             {
                 var t = melon[0];
                 var m = SpawnProduct(t, mess, R(0f, 360f), t.size / Mathf.Max(t.bounds.x, t.bounds.y, t.bounds.z) * R(0.9f, 1.1f));
@@ -168,7 +169,7 @@ static partial class GroceryStoreBuilder
             bin.transform.Rotate(0, -25f, 0, Space.World);
             PlaceOnFloor(bin, new Vector3(east - 6.8f, 0, -16f));
             var oranges = Measure(new[] { ("k:orange", 0.08f) });
-            for (int i = 0; i < 14 && oranges.Count > 0; i++)
+            for (int i = 0; i < 8 && oranges.Count > 0; i++)
             {
                 var t = oranges[0];
                 var o = SpawnProduct(t, mess, R(0f, 360f), t.size / Mathf.Max(t.bounds.x, t.bounds.y, t.bounds.z));
@@ -180,9 +181,76 @@ static partial class GroceryStoreBuilder
 
         // slippery spills from a burst carton, with a sign by each
         DrinkSpill(mess, "Milk", new Color(0.97f, 0.97f, 0.95f), new Color(0.84f, 0.85f, 0.83f), "Milk", new Vector3(x + 2f, 0, 19f), 22f, 17f, rng);
-        WetFloorSign(mess, new Vector3(west + 6f, 0, 30f), 150f);
+        WetFloorSign(mess, new Vector3(west + 7f, 0, 30f), 150f);
         DrinkSpill(mess, "Juice", new Color(1f, 0.62f, 0.12f), new Color(0.82f, 0.42f, 0.05f), "Juice", new Vector3(x + 5f, 0, -88f), 16f, 12f, rng);
-        WetFloorSign(mess, new Vector3(east - 6f, 0, -78f), -30f);
+        WetFloorSign(mess, new Vector3(east - 7f, 0, -78f), -30f);
+    }
+
+    // collision that follows the shopping cart instead of one box per part (the basket's box was solid all the way
+    // through and the wheels' box filled the space under the cart). The frame tubes, chassis, wheels and handle
+    // collide as their own meshes; the wire basket is the biggest mesh and gets one thin box per wall, leaning with
+    // the wall, open at the top. Run on the cart standing upright, before it's tipped over
+    static void FitCartColliders(GameObject cart)
+    {
+        foreach (var c in cart.GetComponentsInChildren<Collider>()) Object.DestroyImmediate(c);
+        var parts = cart.GetComponentsInChildren<MeshFilter>().Where(m => m.sharedMesh != null).ToList();
+        if (parts.Count == 0) return;
+        var basket = parts.OrderByDescending(m => m.sharedMesh.vertexCount).First();
+        foreach (var mf in parts)
+            if (mf != basket) mf.gameObject.AddComponent<MeshCollider>().sharedMesh = mf.sharedMesh;
+
+        var verts = basket.sharedMesh.vertices.Select(v => basket.transform.TransformPoint(v)).ToList();
+        var b = new Bounds(verts[0], Vector3.zero);
+        foreach (var v in verts) b.Encapsulate(v);
+        float t = Mathf.Max(0.3f, b.size.y * 0.04f);
+        var walls = new GameObject("Basket Walls").transform;
+        walls.SetParent(cart.transform, true);
+
+        void Wall(Vector3 center, Vector3 size, Quaternion rot)
+        {
+            var w = new GameObject("Basket Wall").transform;
+            w.SetPositionAndRotation(center, rot);
+            w.SetParent(walls, true);
+            var box = w.gameObject.AddComponent<BoxCollider>();
+            box.size = new Vector3(size.x / w.lossyScale.x, size.y / w.lossyScale.y, size.z / w.lossyScale.z);
+        }
+
+        // the floor of the basket
+        var floor = verts.Where(v => v.y < b.min.y + b.size.y * 0.12f).ToList();
+        Wall(new Vector3((floor.Min(v => v.x) + floor.Max(v => v.x)) / 2, b.min.y + t / 2, (floor.Min(v => v.z) + floor.Max(v => v.z)) / 2),
+            new Vector3(floor.Max(v => v.x) - floor.Min(v => v.x), t, floor.Max(v => v.z) - floor.Min(v => v.z)), Quaternion.identity);
+
+        // the four sides: find each one's lean from the outermost wires low down and high up
+        foreach (int axis in new[] { 0, 2 })
+        foreach (int s in new[] { -1, 1 })
+        {
+            float edge = s > 0 ? b.max[axis] : b.min[axis];
+            var band = verts.Where(v => s * (v[axis] - edge) > -b.size[axis] * 0.12f).ToList();
+            var low = band.Where(v => v.y < b.center.y).ToList();
+            var high = band.Where(v => v.y >= b.center.y).ToList();
+            float lean = 0f, at = edge;
+            if (low.Count > 0 && high.Count > 0)
+            {
+                float a0 = s > 0 ? low.Max(v => v[axis]) : low.Min(v => v[axis]);
+                float a1 = s > 0 ? high.Max(v => v[axis]) : high.Min(v => v[axis]);
+                float y0 = low.Average(v => v.y), y1 = high.Average(v => v.y);
+                lean = (a1 - a0) / Mathf.Max(y1 - y0, 0.01f);
+                at = a0 + lean * (b.center.y - y0);
+            }
+            int across = axis == 0 ? 2 : 0;
+            float w0 = band.Min(v => v[across]), w1 = band.Max(v => v[across]);
+            var center = new Vector3();
+            center[axis] = at - s * t / 2;
+            center.y = b.center.y;
+            center[across] = (w0 + w1) / 2;
+            var size = new Vector3();
+            size[axis] = t;
+            size.y = b.size.y * Mathf.Sqrt(1 + lean * lean);
+            size[across] = w1 - w0;
+            float angle = Mathf.Atan(lean) * Mathf.Rad2Deg;
+            var rot = axis == 0 ? Quaternion.AngleAxis(-angle, Vector3.forward) : Quaternion.AngleAxis(angle, Vector3.right);
+            Wall(center, size, rot);
+        }
     }
 
     // a carton lying where it burst, a puddle of its drink spreading from it, and an ice zone under the puddle

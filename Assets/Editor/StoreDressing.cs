@@ -49,7 +49,7 @@ static partial class GroceryStoreBuilder
         ["drink"] = 0xe544, ["egg"] = 0xeacc, ["icecream"] = 0xea69, ["frozen"] = 0xeb3b, ["fish"] = 0xf1ea,
         ["pizza"] = 0xe552, ["cart"] = 0xe8cc, ["store"] = 0xea12, ["apple"] = 0xea80, ["eco"] = 0xea35,
         ["soup"] = 0xe7d3, ["wine"] = 0xf1e8, ["tag"] = 0xe54e, ["star"] = 0xe838, ["savings"] = 0xe2eb,
-        ["burger"] = 0xea61, ["grocery"] = 0xe547, ["laundry"] = 0xe54a,
+        ["burger"] = 0xea61, ["grocery"] = 0xe547, ["warning"] = 0xe002,
         ["run"] = 0xe566, ["walk"] = 0xe536, ["balance"] = 0xeaf6, ["hand"] = 0xe769, ["stairs"] = 0xf1a9,
         ["jump"] = 0xeacf, ["bolt"] = 0xea0b, ["box"] = 0xe1a1, ["ski"] = 0xe509, ["check"] = 0xe86c,
         ["school"] = 0xe80c, ["play"] = 0xe037, ["settings"] = 0xe8b8, ["close"] = 0xe5cd, ["game"] = 0xea28, ["bulb"] = 0xe0f0,
@@ -138,7 +138,7 @@ static partial class GroceryStoreBuilder
             float iconBox = height * 0.62f;
             float padL = iconLeft != null ? height * 0.95f : height * 0.15f;
             float padR = iconRight != null ? height * 0.95f : height * 0.15f;
-            if (badge != null) padR = Mathf.Max(padR, height * 0.55f);
+            if (badge != null) padR = Mathf.Max(padR, height * 0.8f);
             if (iconLeft != null) MakeIcon(sign, Front(-width / 2 + height * 0.5f, 0, 0.015f), yaw, iconLeft, iconBox, iconColor);
             if (iconRight != null) MakeIcon(sign, Front(width / 2 - height * 0.5f, 0, 0.015f), yaw, iconRight, iconBox, iconColor);
 
@@ -154,16 +154,18 @@ static partial class GroceryStoreBuilder
 
             if (badge != null)
             {
-                float r = height * 0.34f;
+                // a sticker in the top corner, inside the frame (sticking out over the edge it covered the sign above)
+                float r = height * 0.3f;
+                var at = Front(width / 2 - r * 1.25f, height * 0.5f - r * 1.15f, 0.03f);
                 var disc = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                 disc.name = "Badge";
                 disc.transform.SetParent(sign);
-                disc.transform.position = Front(width / 2 - r * 0.7f, height * 0.38f, 0.03f);
+                disc.transform.position = at;
                 disc.transform.rotation = Quaternion.FromToRotation(Vector3.up, n);
                 disc.transform.localScale = new Vector3(r * 2, 0.01f * Scale, r * 2);
                 disc.GetComponent<Renderer>().sharedMaterial = StoreAtmosphere.Emissive("SignBadge", new Color(1f, 0.85f, 0.1f), 1.5f);
                 Object.DestroyImmediate(disc.GetComponent<Collider>());
-                MakeText(sign, Front(width / 2 - r * 0.7f, height * 0.38f, 0.045f), yaw, badge, r * 1.5f, r * 0.8f, new Color(0.6f, 0.05f, 0.05f));
+                MakeText(sign, at + n * 0.015f * Scale, yaw, badge, r * 1.5f, r * 0.8f, new Color(0.6f, 0.05f, 0.05f));
             }
         }
     }
@@ -387,32 +389,29 @@ static partial class GroceryStoreBuilder
                 levels[i], levels[i + 1] - levels[i] - 0.015f * Scale, b.min.z + 0.015f * Scale, b.size.z * 0.9f, +1, maxStack: 3);
     }
 
-    static void MenuBoard(Transform parent, Vector3 center, Vector3 normal, float width, float height, string title, Color color, List<ProductType> items, System.Random rng,
-        string subtitle = null, string iconLeft = null, string iconRight = null, string badge = null)
+    // a backlit sign over a lit menu panel with a row of pictures and prices printed on it. (It used to have real
+    // products standing on a thin ledge along the bottom, which read as groceries floating in front of the sign.)
+    static void MenuBoard(Transform parent, Vector3 center, Vector3 normal, float width, float height, string title, Color color,
+        (string icon, string price)[] menu, string subtitle = null, string iconLeft = null, string iconRight = null)
     {
         BacklitSign(parent, center + Vector3.up * height * 0.25f, normal, width, height * 0.45f, title, color,
-            subtitle: subtitle, iconLeft: iconLeft, iconRight: iconRight, badge: badge);
-        var shelfMat = GetMaterial("SignFrame", new Color(0.08f, 0.08f, 0.09f));
+            subtitle: subtitle, iconLeft: iconLeft, iconRight: iconRight);
         var tint = StoreAtmosphere.Emissive($"MenuGlow_{ColorUtility.ToHtmlStringRGB(color)}", Color.Lerp(color, Color.white, 0.6f), 1.2f);
         bool alongX = Mathf.Abs(normal.z) > 0.5f;
         Vector3 Span(float w, float h, float d) => alongX ? new Vector3(w, h, d) : new Vector3(d, h, w);
-        Vector3 along = alongX ? Vector3.right : Vector3.forward;
 
         Vector3 lowCenter = center - Vector3.up * height * 0.23f;
         Box("Menu Panel", parent, lowCenter, Span(width, height * 0.5f, 0.04f * Scale), tint);
-        float ledgeY = lowCenter.y - height * 0.25f;
-        Box("Menu Ledge", parent, new Vector3(center.x, ledgeY - 0.01f * Scale, center.z) + normal * 0.12f * Scale,
-            Span(width, 0.02f * Scale, 0.22f * Scale), shelfMat);
-        if (items.Count == 0) return;
-        int n = Mathf.Max(3, Mathf.RoundToInt(width / (0.6f * Scale)));
-        for (int i = 0; i < n; i++)
+        var ink = Color.Lerp(color, Color.black, 0.55f);
+        var right = Vector3.Cross(Vector3.up, -normal).normalized;
+        float yaw = Mathf.Atan2(-normal.x, -normal.z) * Mathf.Rad2Deg;
+        var face = lowCenter + normal * 0.035f * Scale;
+        float slot = width / menu.Length;
+        for (int i = 0; i < menu.Length; i++)
         {
-            var t = items[i % items.Count];
-            float slot = width / n;
-            float s = Mathf.Min(slot * 0.7f / Mathf.Max(t.bounds.x, t.bounds.z), height * 0.4f / t.bounds.y);
-            float yaw = Mathf.Atan2(normal.x, normal.z) * Mathf.Rad2Deg + (alongX ? 0 : 90);
-            var p = SpawnProduct(t, parent, t.yaw + 90 + yaw, s);
-            PlaceOnFloor(p, new Vector3(center.x, ledgeY, center.z) + along * (-width / 2 + (i + 0.5f) * slot) + normal * 0.12f * Scale);
+            var at = face + right * (-width / 2 + (i + 0.5f) * slot);
+            MakeIcon(parent, at + Vector3.up * height * 0.06f, yaw, menu[i].icon, Mathf.Min(slot * 0.55f, height * 0.26f), ink);
+            MakeText(parent, at - Vector3.up * height * 0.15f, yaw, menu[i].price, slot * 0.6f, height * 0.09f, ink);
         }
     }
 
@@ -477,17 +476,19 @@ static partial class GroceryStoreBuilder
         Prop("plantSmall2", 0.8f, 0.6f, alongX: true, new Vector3(left + CheckoutWidth * 0.95f, 0, 6.2f * Scale));
         Prop("plantSmall1", 0.8f, 0.6f, alongX: true, new Vector3(left + CheckoutWidth * 0.95f, 0, -6.8f * Scale));
 
-        var bakery = Measure(new[] { ("Bread", 0.28f), ("k:croissant", 0.14f), ("k:cake", 0.25f), ("coffee", 0.18f), ("k:donut-chocolate", 0.1f), ("k:pie", 0.25f) });
         MenuBoard(root, new Vector3(left + 0.08f * Scale, DoorHeight + 0.85f * Scale, 0), Vector3.right, 6f * Scale, 1.4f * Scale,
-            "BAKERY  •  DELI  •  COFFEE", new Color(0.9f, 0.5f, 0.1f), bakery, rng,
-            subtitle: "FRESH FROM OUR OVENS", iconLeft: "bakery", iconRight: "coffee", badge: "$1.99");
+            "BAKERY  •  DELI  •  COFFEE", new Color(0.9f, 0.5f, 0.1f),
+            new[] { ("bakery", "$2.49"), ("breakfast", "$1.29"), ("cake", "$6.99"), ("cookie", "$0.99"), ("coffee", "$1.49") },
+            subtitle: "FRESH FROM OUR OVENS", iconLeft: "bakery", iconRight: "coffee");
         float midAisles = (left + CheckoutWidth + right) / 2;
         MenuBoard(root, new Vector3(midAisles, CoolerHeight + 1.35f * Scale, depth / 2 - 0.08f * Scale), Vector3.back, 9f * Scale, 1.3f * Scale,
-            "ICE COLD DRINKS", new Color(0.1f, 0.4f, 0.9f), Measure(CoolerDrinks), rng,
-            subtitle: "MILK  •  JUICE  •  SODA", iconLeft: "drink", iconRight: "wine", badge: "2/$4");
+            "ICE COLD DRINKS", new Color(0.1f, 0.4f, 0.9f),
+            new[] { ("drink", "MILK $2.99"), ("egg", "EGGS $3.49"), ("drink", "SODA $1.99"), ("wine", "WINE $8.99") },
+            subtitle: "MILK  •  JUICE  •  SODA", iconLeft: "drink", iconRight: "wine");
         MenuBoard(root, new Vector3(midAisles, CoolerHeight + 1.35f * Scale, -depth / 2 + 0.08f * Scale), Vector3.forward, 9f * Scale, 1.3f * Scale,
-            "FROZEN TREATS", new Color(0.85f, 0.12f, 0.2f), Measure(CoolerFrozen), rng,
-            subtitle: "ICE CREAM  •  PIZZA  •  MEAT", iconLeft: "icecream", iconRight: "pizza", badge: "SALE");
+            "FROZEN TREATS", new Color(0.85f, 0.12f, 0.2f),
+            new[] { ("icecream", "ICE CREAM $4.99"), ("pizza", "PIZZA $5.49"), ("fish", "FISH $7.99"), ("frozen", "VEG $1.79") },
+            subtitle: "ICE CREAM  •  PIZZA  •  MEAT", iconLeft: "icecream", iconRight: "pizza");
 
         var posters = new[]
         {

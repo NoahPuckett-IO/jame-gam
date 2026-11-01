@@ -23,6 +23,8 @@ static class WebGLBuild
         PerformanceSettings.EnsureOcclusion();
         // the editor sometimes revalidates Henry.mat and drops its _EMISSION keyword; put his glow back before every build
         CharacterSetup.HenryMaterial();
+        // straight into the game, no Unity logo first (every licence may turn it off since Unity 6)
+        PlayerSettings.SplashScreen.show = false;
         AssetDatabase.SaveAssets();
         // itch serves files without Content-Encoding headers, so Gzip needs the decompression fallback.
         PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Gzip;

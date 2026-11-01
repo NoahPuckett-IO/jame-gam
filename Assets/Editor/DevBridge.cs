@@ -127,6 +127,7 @@ static class DevBridge
             case "matusers": MatUsers(arg); break;
             case "seals": Seals(); break;
             case "bg": PlayingOnly(); Application.runInBackground = true; break;
+            case "parts": Parts(arg); break;
             default: throw new System.Exception("unknown command");
         }
     }
@@ -342,6 +343,22 @@ static class DevBridge
             .Select(g => $"{g.Count(),4}  {g.Key}\n" + string.Join("\n", g.Take(12).Select(c =>
                 $"        {PathOf(c.transform.parent)}  min={c.bounds.min:F1} max={c.bounds.max:F1}")));
         File.WriteAllText(System.IO.Path.Combine(Root, "seals.txt"), string.Join("\n", lines));
+    }
+
+    // parts Assets/path.fbx: each mesh in a model with its vertex count, materials and local bounds, into parts.txt
+    static void Parts(string path)
+    {
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+        if (prefab == null) throw new System.Exception("no model " + path);
+        var sb = new StringBuilder();
+        foreach (var mf in prefab.GetComponentsInChildren<MeshFilter>())
+        {
+            var m = mf.sharedMesh;
+            var mats = mf.GetComponent<Renderer>().sharedMaterials.Select(x => x != null ? x.name : "-");
+            sb.AppendLine($"{mf.name}: verts {m.vertexCount} subs {m.subMeshCount} bounds c={m.bounds.center:F3} s={m.bounds.size:F3} " +
+                $"pos={mf.transform.localPosition:F3} rot={mf.transform.localEulerAngles:F0} scale={mf.transform.localScale:F3} mats {string.Join(",", mats)}");
+        }
+        File.WriteAllText(System.IO.Path.Combine(Root, "parts.txt"), sb.ToString());
     }
 
     // matusers Name: the scene renderers using a material of that name, grouped by their parent path, into matusers.txt

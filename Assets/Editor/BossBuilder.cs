@@ -20,7 +20,6 @@ static partial class GroceryStoreBuilder
             var aisle = BuildAisle(5, store, edge - shelf.gondolaDepth / 2, units, aisleLength, shelfPrefab, shelf);
             StockAisle(aisle, shelf, aisleLength, Stock[Stock.Length - 1], sides: new[] { 1 });
         }
-        HangAisleSign(store, x, zS, 5, "CLEANING SUPPLIES", 0, "SOAP • MOPS • VACUUMS", "laundry");
         Seal(root, "Above Aisle 5", new Vector3(edge - shelf.gondolaDepth / 2, (ShelfHeight - 0.4f + WallHeight) / 2, 0), new Vector3(shelf.gondolaDepth, WallHeight - ShelfHeight + 0.4f, aisleLength));
 
         EndBlock(root, "South Block", edge - shelf.gondolaDepth, edge, -wallZ, zS, out _);
@@ -34,25 +33,36 @@ static partial class GroceryStoreBuilder
         devWarps.Add(("Boss", new Vector3(x, 1, zS + 6f), 0));
 
         var rng = new System.Random(808);
-        var spots = new List<Vector2>();
         float zMid = (zS + zN) / 2;
         var can = BeanCanBuilder.GetOrCreate();
         var crate = BoxPrefab(BoxKind.Sealed);
         var wooden = Usable(AssetDatabase.LoadAssetAtPath<GameObject>($"{PlatformerFolder}/crate.fbx"), $"{PlatformerFolder}/crate.fbx");
         var fruit = Measure(new[] { ("Apple", 0.09f), ("k:orange", 0.08f), ("k:lemon", 0.07f), ("k:pear", 0.1f) });
-        for (int tries = 0; spots.Count < 16 && tries < 400; tries++)
+        float r = 3.1f;
+        var xs = new Vector2(x - half + r + 0.4f, x + half - r - 0.4f);
+        var zs = new Vector2(zS + 16f, zN - 8f);
+
+        // cover scattered anywhere across the aisle, at least 11 apart and clear of where the vacuum sleeps. Five kinds,
+        // each with how far it reaches from its centre: a cereal box stood up, two cans, two boxes, a cereal box knocked
+        // on its side (a long low wall) and a pair of produce crates with fruit on them
+        float[] reach = { 3.4f, 2.2f, 3.2f, 4.4f, 5f };
+        var cover = new List<(Vector2 at, int kind, float reach)>();
+        for (int tries = 0; cover.Count < 16 && tries < 600; tries++)
         {
             var p = new Vector2(x + ((float)rng.NextDouble() - 0.5f) * (WalkwayWidth - 10f), Mathf.Lerp(zS + 22f, zN - 12f, (float)rng.NextDouble()));
-            // the centre lane stays clear: the vacuum patrols up and down it while it scans
-            if (Mathf.Abs(p.x - x) < 8f) continue;
+            if (Vector2.Distance(p, new Vector2(x, zMid)) < 10f) continue;
             bool clear = true;
-            foreach (var s in spots) if (Vector2.Distance(s, p) < 11f) clear = false;
+            foreach (var s in cover) if (Vector2.Distance(s.at, p) < 11f) clear = false;
             if (!clear) continue;
-            spots.Add(p);
+            int k = (cover.Count + 1) % 5;
+            cover.Add((p, k, reach[k]));
+        }
+        // the route it sweeps while scanning snakes between them (any that would leave no way through are dropped)
+        var route = BossRoute(cover, xs, zs, zMid, x, r);
+
+        foreach (var (p, kind, _) in cover)
+        {
             var at = new Vector3(p.x, 0, p.y);
-            // five kinds of cover: a cereal box stood up, two cans, two boxes, a cereal box knocked on its side (a
-            // long low wall) and a pair of produce crates with fruit on them
-            int kind = spots.Count % 5;
             if (kind == 0)
             {
                 var b = CerealBox(root, rng.Next(6));
@@ -111,11 +121,10 @@ static partial class GroceryStoreBuilder
         }
 
         var vac = BuildVacuum(root, new Vector3(x, 0, zMid), out var parts);
-        float r = 3.1f;
         var boss = vac.gameObject.AddComponent<RoombaBoss>();
-        boss.Setup(parts.eye, parts.fan, parts.button, parts.led, parts.light, parts.brushes, r, 1.46f,
-            new Vector2(x - half + r + 0.4f, x + half - r - 0.4f), new Vector2(zS + 16f, zN - 8f), zS + 18f,
-            x - half - 3f, x + half + 3f, gate.gameObject, gateSeal, new[] { Glyph("game"), Glyph("run"), Glyph("bulb"), Glyph("star") });
+        boss.Setup(parts.eye, parts.fan, parts.button, parts.led, parts.light, parts.brushes, r, 1.46f, xs, zs, zS + 18f,
+            x - half - 3f, x + half + 3f, gate.gameObject, gateSeal, new[] { Glyph("game"), Glyph("run"), Glyph("bulb"), Glyph("star") },
+            route.ToArray());
 
         var door = GameObject.Find("Sliding Door");
         if (door != null)
@@ -130,6 +139,69 @@ static partial class GroceryStoreBuilder
             var bodyFont = AssetDatabase.LoadAssetAtPath<Font>("Assets/Fonts/Oswald.ttf") ?? titleFont;
             end.AddComponent<EndCredits>().Setup(titleFont, bodyFont, Vector3.left);
             devWarps.Add(("Exit", door.transform.position + new Vector3(24f, 1f, 0f), -90));
+        }
+    }
+
+    // the vacuum's scanning sweep: a slalom up the aisle that keeps its whole body clear of every piece of cover. It
+    // picks an x on each row of z a few units apart, as close as it can to a weaving line and never jumping far
+    // sideways between rows, and goes through the middle where the vacuum sleeps. When some row has no clear x at all,
+    // the cover nearest that row is dropped and it tries again
+    static List<Vector3> BossRoute(List<(Vector2 at, int kind, float reach)> cover, Vector2 xs, Vector2 zs, float zHome, float xHome, float body)
+    {
+        const float rowStep = 4f, xStep = 0.5f, maxShift = 4f, margin = 1.2f, wave = 44f;
+        int rows = Mathf.FloorToInt((zs.y - zs.x) / rowStep) + 1, cols = Mathf.FloorToInt((xs.y - xs.x) / xStep) + 1;
+        float X(int c) => xs.x + c * xStep;
+        float Z(int row) => zs.x + row * rowStep;
+        float Aim(float z) => Mathf.Abs(z - zHome) < 6f ? xHome : xHome + (xs.y - xs.x) * 0.38f * Mathf.Sin((z - zs.x) / wave * Mathf.PI * 2f);
+        while (true)
+        {
+            bool Free(float px, float pz)
+            {
+                foreach (var c in cover)
+                    if (Vector2.Distance(c.at, new Vector2(px, pz)) < c.reach + body + margin) return false;
+                return true;
+            }
+            var cost = new float[rows, cols];
+            var from = new int[rows, cols];
+            int stuck = -1;
+            for (int row = 0; row < rows && stuck < 0; row++)
+            {
+                bool any = false;
+                for (int c = 0; c < cols; c++)
+                {
+                    cost[row, c] = float.PositiveInfinity;
+                    if (!Free(X(c), Z(row))) continue;
+                    float here = Mathf.Abs(X(c) - Aim(Z(row)));
+                    if (row == 0) { cost[row, c] = here; any = true; continue; }
+                    int reachCols = Mathf.RoundToInt(maxShift / xStep);
+                    for (int p = Mathf.Max(0, c - reachCols); p <= Mathf.Min(cols - 1, c + reachCols); p++)
+                    {
+                        if (float.IsInfinity(cost[row - 1, p]) || !Free((X(c) + X(p)) / 2, Z(row) - rowStep / 2)) continue;
+                        float total = cost[row - 1, p] + here + Mathf.Abs(X(c) - X(p)) * 0.6f;
+                        if (total < cost[row, c]) { cost[row, c] = total; from[row, c] = p; }
+                    }
+                    if (!float.IsInfinity(cost[row, c])) any = true;
+                }
+                if (!any) stuck = row;
+            }
+            if (stuck < 0)
+            {
+                int best = 0;
+                for (int c = 1; c < cols; c++) if (cost[rows - 1, c] < cost[rows - 1, best]) best = c;
+                var path = new List<Vector3>();
+                for (int row = rows - 1; row >= 0; row--)
+                {
+                    path.Add(new Vector3(X(best), 0, Z(row)));
+                    best = from[row, best];
+                }
+                path.Reverse();
+                return path;
+            }
+            float zStuck = Z(stuck);
+            int drop = 0;
+            for (int i = 1; i < cover.Count; i++)
+                if (Mathf.Abs(cover[i].at.y - zStuck) < Mathf.Abs(cover[drop].at.y - zStuck)) drop = i;
+            cover.RemoveAt(drop);
         }
     }
 

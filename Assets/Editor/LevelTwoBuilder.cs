@@ -533,26 +533,109 @@ static partial class GroceryStoreBuilder
         return mat;
     }
 
+    // a yellow plastic A-frame caution sign: two tapered boards hinged under a carry handle, black rubber feet, and the
+    // print on both outer faces (a black CAUTION band, the warning triangle, WET FLOOR in English and Spanish). It
+    // used to be two flat slabs with a line of text; one box collider covers the whole sign
     static void WetFloorSign(Transform parent, Vector3 floorAt, float yaw)
     {
         var root = new GameObject("Wet Floor Sign").transform;
         root.SetParent(parent);
         root.SetPositionAndRotation(floorAt, Quaternion.Euler(0, yaw, 0));
         var yellow = GetMaterial("Caution Yellow", new Color(1f, 0.82f, 0.05f));
-        float h = 0.6f * Scale, w = 0.3f * Scale;
+        var black = GetMaterial("Caution Black", new Color(0.07f, 0.07f, 0.08f));
+        const float h = 0.6f * Scale, bw = 0.3f * Scale, tw = bw * 0.74f, t = 0.22f, spread = 13f;
+        float hinge = h * Mathf.Cos(spread * Mathf.Deg2Rad) + 0.2f;
+        var mesh = CautionBoardMesh(bw, tw, h, t);
+        float Width(float y) => tw + (bw - tw) * (-y / h);
+        void Part(Transform p, string name, PrimitiveType type, Vector3 local, Vector3 scale, Material m, Vector3 euler = default)
+        {
+            var g = GameObject.CreatePrimitive(type);
+            g.name = name;
+            g.transform.SetParent(p, false);
+            g.transform.localPosition = local;
+            g.transform.localRotation = Quaternion.Euler(euler);
+            g.transform.localScale = scale;
+            g.GetComponent<Renderer>().sharedMaterial = m;
+            Object.DestroyImmediate(g.GetComponent<Collider>());
+        }
+        // text and icons are made in world space; pin each to its spot on the board's outer face
+        void Pin(Transform board, Vector3 local)
+        {
+            var c = board.GetChild(board.childCount - 1);
+            c.localPosition = local;
+            c.localRotation = Quaternion.identity;
+        }
+
         foreach (int s in new[] { -1, 1 })
         {
-            var panel = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            panel.name = "Panel";
-            panel.transform.SetParent(root, false);
-            panel.transform.localPosition = new Vector3(0, h / 2 * 0.97f, s * h * 0.12f);
-            panel.transform.localRotation = Quaternion.Euler(s * -14f, 0, 0);
-            panel.transform.localScale = new Vector3(w, h, 0.15f);
-            panel.GetComponent<Renderer>().sharedMaterial = yellow;
-            float textYaw = yaw + (s < 0 ? 0 : 180);
-            MakeText(root, root.TransformPoint(new Vector3(0, h * 0.55f, s * (h * 0.12f + 0.25f))), textYaw, "CAUTION\nWET FLOOR", w * 0.8f, h * 0.3f, Color.black, lit: true);
-            MakeIcon(root, root.TransformPoint(new Vector3(0, h * 0.25f, s * (h * 0.12f + 0.2f))), textYaw, "walk", w * 0.45f, Color.black, lit: true);
+            var board = new GameObject(s < 0 ? "Front Board" : "Back Board").transform;
+            board.SetParent(root, false);
+            board.localPosition = new Vector3(0, hinge, 0);
+            board.localRotation = Quaternion.Euler(spread, s < 0 ? 0 : 180, 0);
+            board.gameObject.AddComponent<MeshFilter>().sharedMesh = mesh;
+            board.gameObject.AddComponent<MeshRenderer>().sharedMaterial = yellow;
+            float face = -t / 2;
+            Part(board, "Caution Band", PrimitiveType.Cube, new Vector3(0, -0.17f * h, face - 0.02f), new Vector3(Width(-0.17f * h) * 0.9f, 0.2f * h, 0.04f), black);
+            MakeText(board, board.position, 0, "CAUTION", Width(-0.17f * h) * 0.78f, 0.15f * h, new Color(1f, 0.82f, 0.05f), lit: true);
+            Pin(board, new Vector3(0, -0.17f * h, face - 0.05f));
+            MakeIcon(board, board.position, 0, "warning", 0.27f * h, Color.black, lit: true);
+            Pin(board, new Vector3(0, -0.45f * h, face - 0.03f));
+            MakeText(board, board.position, 0, "WET FLOOR", Width(-0.68f * h) * 0.82f, 0.12f * h, Color.black, lit: true);
+            Pin(board, new Vector3(0, -0.68f * h, face - 0.03f));
+            MakeText(board, board.position, 0, "PISO MOJADO", Width(-0.81f * h) * 0.6f, 0.06f * h, Color.black, lit: true);
+            Pin(board, new Vector3(0, -0.81f * h, face - 0.03f));
+            foreach (int side in new[] { -1, 1 })
+                Part(board, "Foot", PrimitiveType.Cube, new Vector3(side * (bw / 2 - 0.4f), -h + 0.2f, 0), new Vector3(0.8f, 0.4f, t + 0.14f), black);
         }
+        // the hinge rod and the carry handle on top
+        Part(root, "Hinge", PrimitiveType.Cylinder, new Vector3(0, hinge, 0), new Vector3(0.45f, tw / 2, 0.45f), black, new Vector3(0, 0, 90));
+        foreach (int side in new[] { -1, 1 })
+            Part(root, "Handle Post", PrimitiveType.Cube, new Vector3(side * tw * 0.26f, hinge + 0.8f, 0), new Vector3(0.4f, 1.6f, 0.4f), yellow);
+        Part(root, "Handle Grip", PrimitiveType.Cube, new Vector3(0, hinge + 1.6f, 0), new Vector3(tw * 0.52f + 0.4f, 0.45f, 0.45f), yellow);
+        foreach (var r in root.GetComponentsInChildren<Renderer>()) r.gameObject.isStatic = true;
+        var col = root.gameObject.AddComponent<BoxCollider>();
+        float foot = h * Mathf.Sin(spread * Mathf.Deg2Rad) + t;
+        col.center = new Vector3(0, (hinge + 1.8f) / 2, 0);
+        col.size = new Vector3(bw, hinge + 1.8f, foot * 2);
+    }
+
+    static Mesh cautionBoard;
+
+    // one board of the caution sign: a tapered slab hanging from its top edge (the hinge, at the origin) down to y = -h,
+    // its outer face towards -z, hard edges. Made fresh once per editor session and shared by every sign (remaking it
+    // for each sign deleted the mesh out from under the ones already built)
+    static Mesh CautionBoardMesh(float bottomWidth, float topWidth, float h, float thick)
+    {
+        if (cautionBoard != null) return cautionBoard;
+        const string path = "Assets/Models/CautionBoard.asset";
+        AssetDatabase.DeleteAsset(path);
+        var verts = new List<Vector3>();
+        var tris = new List<int>();
+        void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 outward)
+        {
+            if (Vector3.Dot(Vector3.Cross(b - a, c - a), outward) < 0) (a, b, c, d) = (d, c, b, a);
+            int i = verts.Count;
+            verts.Add(a); verts.Add(b); verts.Add(c); verts.Add(d);
+            tris.AddRange(new[] { i, i + 1, i + 2, i, i + 2, i + 3 });
+        }
+        float z = thick / 2;
+        Vector3 TL(float s) => new Vector3(-topWidth / 2, 0, s * z);
+        Vector3 TR(float s) => new Vector3(topWidth / 2, 0, s * z);
+        Vector3 BL(float s) => new Vector3(-bottomWidth / 2, -h, s * z);
+        Vector3 BR(float s) => new Vector3(bottomWidth / 2, -h, s * z);
+        Quad(TL(-1), TR(-1), BR(-1), BL(-1), Vector3.back);
+        Quad(TR(1), TL(1), BL(1), BR(1), Vector3.forward);
+        Quad(TL(1), TR(1), TR(-1), TL(-1), Vector3.up);
+        Quad(BL(-1), BR(-1), BR(1), BL(1), Vector3.down);
+        Quad(TL(-1), BL(-1), BL(1), TL(1), Vector3.left);
+        Quad(TR(1), BR(1), BR(-1), TR(-1), Vector3.right);
+        var mesh = new Mesh { name = "Caution Board" };
+        mesh.SetVertices(verts);
+        mesh.SetTriangles(tris, 0);
+        mesh.RecalculateNormals();
+        mesh.RecalculateBounds();
+        AssetDatabase.CreateAsset(mesh, path);
+        return cautionBoard = mesh;
     }
 
     // the cleaner's yellow mop bucket on castors, grey water in it and the wringer on one side; one box collider

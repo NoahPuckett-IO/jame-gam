@@ -528,14 +528,14 @@ static partial class GroceryStoreBuilder
         return mat;
     }
 
-    static void HangAisleSign(Transform store, float x, float z, int number, string label, int damage = 0, string subtitle = null, string icon = null)
+    static void HangAisleSign(Transform store, float x, float z, int number, string label, int damage = 0)
     {
         var sign = new GameObject($"Aisle Sign {number}").transform;
         sign.SetParent(store);
         sign.position = new Vector3(x, WallHeight - 1.1f * Scale, z);
 
         BacklitSign(sign, sign.position, Vector3.back, 1.7f * Scale, 0.6f * Scale, label, new Color(0.12f, 0.35f, 0.62f),
-            twoSided: true, subtitle: subtitle ?? AisleSubtitles[number - 1], iconRight: icon ?? AisleIcons[number - 1],
+            twoSided: true, subtitle: AisleSubtitles[number - 1], iconRight: AisleIcons[number - 1],
             iconLeft: "");
         var disc = GetMaterial("SignDisc", Color.white);
         foreach (var n in new[] { Vector3.back, Vector3.forward })

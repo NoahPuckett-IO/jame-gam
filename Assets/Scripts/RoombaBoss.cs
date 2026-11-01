@@ -18,7 +18,7 @@ public class RoombaBoss : MonoBehaviour
 
     [SerializeField] float viewRange = 46f, viewHalfAngle = 26f;
     [SerializeField] float scanSeconds = 30f, rampageSeconds = 20f;
-    [SerializeField] float laneX;
+    [SerializeField] Vector3[] patrol;      // the slalom between the cover it sweeps back and forth while scanning
 
     static readonly Color ScanColor = new Color(1f, 0.85f, 0.2f, 0.45f);
     static readonly Color AlertColor = new Color(1f, 0.15f, 0.1f, 0.55f);
@@ -30,7 +30,7 @@ public class RoombaBoss : MonoBehaviour
     Mesh fanMesh;
     Vector3[] fanVerts;
     float phaseTime, seenTime, chaseLeft, pauseLeft, spin = 35f, spinDir = 1f, nextFlip;
-    bool patrolNorth = true;
+    int patrolIndex = -1, patrolStep = 1;
     Vector3 target;
     bool rampWest, hasTarget;
     Vector3 homePos;
@@ -82,7 +82,8 @@ public class RoombaBoss : MonoBehaviour
         chaseLeft = 0f;
         pauseLeft = 0f;
         hasTarget = false;
-        patrolNorth = true;
+        patrolIndex = -1;
+        patrolStep = 1;
         SetButton(new Color(1f, 0.2f, 0.1f), 2f);
     }
 
@@ -216,8 +217,8 @@ public class RoombaBoss : MonoBehaviour
         }
     }
 
-    // while it scans it also sweeps up and down the aisle along its clear centre lane, so hiding in one spot
-    // behind a box doesn't work for long: the cone comes round from a new angle as it passes
+    // while it scans it also sweeps up and down the aisle, weaving between the cover, so hiding in one spot behind a
+    // box doesn't work for long: the cone comes round from a new angle as it passes
     void Patrol()
     {
         if (pauseLeft > 0f)
@@ -225,17 +226,24 @@ public class RoombaBoss : MonoBehaviour
             pauseLeft -= Time.deltaTime;
             return;
         }
-        float endZ = patrolNorth ? zRange.y - 2f : zRange.x + 2f;
-        float speed = Mathf.Lerp(7f, 12f, phaseTime / scanSeconds);
+        if (patrol == null || patrol.Length < 2) return;
         var p = transform.position;
-        p.x = Mathf.MoveTowards(p.x, laneX, speed * Time.deltaTime);
-        p.z = Mathf.MoveTowards(p.z, endZ, speed * Time.deltaTime);
-        transform.position = p;
-        if (Mathf.Abs(p.z - endZ) < 0.01f)
+        if (patrolIndex < 0)
         {
-            patrolNorth = !patrolNorth;
+            patrolIndex = 0;
+            for (int i = 1; i < patrol.Length; i++)
+                if ((patrol[i] - p).sqrMagnitude < (patrol[patrolIndex] - p).sqrMagnitude) patrolIndex = i;
+        }
+        float speed = Mathf.Lerp(7f, 12f, phaseTime / scanSeconds);
+        var goal = new Vector3(patrol[patrolIndex].x, p.y, patrol[patrolIndex].z);
+        transform.position = Vector3.MoveTowards(p, goal, speed * Time.deltaTime);
+        if ((transform.position - goal).sqrMagnitude > 0.0001f) return;
+        if (patrolIndex + patrolStep < 0 || patrolIndex + patrolStep >= patrol.Length)
+        {
+            patrolStep = -patrolStep;
             pauseLeft = 0.8f;
         }
+        patrolIndex += patrolStep;
     }
 
     void Rampage()
@@ -536,7 +544,7 @@ public class RoombaBoss : MonoBehaviour
 
     public void Setup(Transform eyeT, Transform fanT, Renderer button, Renderer led, Light light, Transform[] brushSet,
         float bodyRadius, float bodyTop, Vector2 xs, Vector2 zs, float startAt, float westX, float eastX,
-        GameObject gateRoot, Collider seal, string[] icons)
+        GameObject gateRoot, Collider seal, string[] icons, Vector3[] route)
     {
         eye = eyeT;
         fan = fanT;
@@ -555,6 +563,6 @@ public class RoombaBoss : MonoBehaviour
         gate = gateRoot;
         gateSeal = seal;
         glyphs = icons;
-        laneX = (xs.x + xs.y) / 2f;
+        patrol = route;
     }
 }
