@@ -105,6 +105,7 @@ static partial class GroceryStoreBuilder
         KitLadder(level, new Vector3(xE, 0, 68f), Vector3.left, 1.6f, hall.h1, new Vector3(xE + 2.2f, hall.h1, 68f));
         CarryBox(level, new Vector3(xc - 9f, 0, 47f), 1.6f);
         CarryBox(level, new Vector3(xc - 12f, 0, 57f), 1.6f);
+        MopBucket(level, new Vector3(xc + 11f, 0, 46f), -30f);
         ScatterLitter(level, xc, w, L1BarrierB + 6f, L1BarrierC - 8f, 23, 26, onlySide: -1);
         for (int i = 0; i < 3; i++)
             Fallen(level, i + 2, Quaternion.Euler(0, rng.Next(360), 90), new Vector3(xc - 13f + i * 1.5f, 0, 40f + i * 7f));
@@ -120,6 +121,7 @@ static partial class GroceryStoreBuilder
         // room D
         ScatterLitter(level, xc, w, L1BarrierC + 6f, zN - 3f, 37, 24, onlySide: 1);
         WetFloorSign(level, new Vector3(xc - 14f, 0, 90f), 160f);
+        Broom(level, new Vector3(xc - 15f, 0, 98f), new Vector3(1f, 0, -0.25f));
 
         float northCorridor = (aisleLength / 2 + depth / 2 - CoolerDepth) / 2;
         float southCorridor = -northCorridor;
@@ -355,7 +357,7 @@ static partial class GroceryStoreBuilder
         }
         mat.SetTexture("_BaseMap", tex);
         mat.color = Color.white;
-        mat.SetFloat("_Smoothness", 0.28f);
+        mat.SetFloat("_Smoothness", part == CerealPart.Cardboard ? 0.08f : 0.2f);
         EditorUtility.SetDirty(mat);
         return mat;
     }
@@ -369,6 +371,9 @@ static partial class GroceryStoreBuilder
         float W = CerealW * sizeScale, H = CerealH * sizeScale, D = CerealD * sizeScale;
         Box("Box", root.transform, Vector3.zero, new Vector3(W, H, D), CerealMat(style, CerealPart.Body));
         var frontMat = CerealMat(style, CerealPart.Front);
+        // the name sits on the art's label panel (the accent colour, lightened); white vanished on the pale ones
+        var label = Color.Lerp(s.art.accent, Color.white, 0.25f);
+        var nameInk = label.grayscale > 0.6f ? s.art.deep : Color.white;
         ArtQuad(root.transform, "Nutrition Side", new Vector3(W / 2 + 0.02f, 0, 0), Quaternion.Euler(0, -90, 0), new Vector2(D, H), CerealMat(style, CerealPart.Side));
         ArtQuad(root.transform, "Ingredients Side", new Vector3(-W / 2 - 0.02f, 0, 0), Quaternion.Euler(0, 90, 0), new Vector2(D, H), CerealMat(style, CerealPart.SideB));
         ArtQuad(root.transform, "Top Flaps", new Vector3(0, H / 2 + 0.02f, 0), Quaternion.Euler(90, 0, 0), new Vector2(W, D), CerealMat(style, CerealPart.Top));
@@ -386,7 +391,7 @@ static partial class GroceryStoreBuilder
             float yaw = face < 0 ? 0 : 180;
             var outward = new Vector3(0, 0, face * (D / 2 + 0.06f));
             var right = face < 0 ? 1f : -1f;
-            MakeText(root.transform, new Vector3(0, H * 0.3f, 0) + outward, yaw, s.brand, W * 0.8f, H * 0.2f, Color.white, lit: true);
+            MakeText(root.transform, new Vector3(0, H * 0.3f, 0) + outward, yaw, s.brand, W * 0.8f, H * 0.2f, nameInk, lit: true);
             MakeText(root.transform, new Vector3(0, H * 0.165f, 0) + outward, yaw, s.tag, W * 0.6f, H * 0.035f, new Color(1f, 1f, 0.85f), lit: true);
             MakeText(root.transform, new Vector3(right * W * 0.324f, H * 0.083f, 0) + outward, yaw, "NEW!", W * 0.16f, H * 0.04f, Color.white, lit: true);
             MakeText(root.transform, new Vector3(0, -H * 0.462f, 0) + outward, yaw, "FAMILY SIZE  •  NET WT 18 OZ (510g)", W * 0.8f, H * 0.03f, Color.white, lit: true);
@@ -503,7 +508,7 @@ static partial class GroceryStoreBuilder
                 continue;
             }
             var t = items[rng.Next(items.Count)];
-            var p = Spawn(t.prefab, root, (float)rng.NextDouble() * 360f, t.size / Mathf.Max(t.bounds.x, t.bounds.y, t.bounds.z));
+            var p = SpawnProduct(t, root, (float)rng.NextDouble() * 360f, t.size / Mathf.Max(t.bounds.x, t.bounds.y, t.bounds.z));
             string n = t.prefab.name;
             bool rolls = n.Contains("can") || n.Contains("Can") || n.Contains("cup") || n.Contains("stick") || n.Contains("chopstick");
             if (rolls && rng.NextDouble() < 0.7) p.transform.rotation = Quaternion.Euler(90, (float)rng.NextDouble() * 360f, 0) * p.transform.rotation;

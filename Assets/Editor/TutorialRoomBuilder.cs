@@ -24,7 +24,7 @@ static partial class GroceryStoreBuilder
 
     // a long white room in a row of stations, each closed off by a glass gate until its lesson is done:
     //   walk -> jump up two steps -> dash over a pit -> carry a box to a ledge -> climb a ladder -> ride the tray
-    //   slide down over a second pit -> glide across the ice and stop on the pad
+    //   slide down over a second pit -> glide across the ice to the exit
     static void BuildTutorialRoom(Transform store)
     {
         var root = new GameObject("Tutorial Room").transform;
@@ -118,9 +118,9 @@ static partial class GroceryStoreBuilder
         const float deck = 8f;
         Box("Platform", root, P(0, deck / 2, 97f), new Vector3(W, deck, 10f), white);
         KitLadder(root, P(0, 0, 92f), Vector3.back, 0f, deck, P(0, deck, 94.2f));
-        Slide(root, P(0, deck, 101.6f), P(0, 0.4f, 124f), 4.5f, exitSpeed: 9f);
+        Slide(root, P(0, deck, 101.6f), P(0, 0.4f, 124f), 4.5f, exitSpeed: 9f, ceiling: H);
 
-        // ice: a rink with pillars to glide round and a pad to stop on
+        // ice: a rink with pillars to glide round on the way to the exit
         IceZoneBox(root, P(0, 1.5f, 161f), new Vector3(W, 3f, 50f));
         foreach (var (x, z) in new[] { (-5f, 146f), (5f, 156f), (-3.5f, 167f) })
         {
@@ -132,7 +132,6 @@ static partial class GroceryStoreBuilder
             pillar.GetComponent<Renderer>().sharedMaterial = white;
             pillar.isStatic = true;
         }
-        Object.DestroyImmediate(Box2("Stop Pad", root, P(0, 0.012f, 179f), new Vector3(8f, 0.02f, 6f), accent).GetComponent<Collider>());
 
         var start = Waypoint(root, "Tutorial Start", P(0, 1, 4f), 0);
         Transform Respawn(string name, float y, float z) => Waypoint(root, name, P(0, y, z), 0);
@@ -161,9 +160,9 @@ static partial class GroceryStoreBuilder
             new TutorialRoom.Lesson { icon = Glyph("ski"), title = "SLIDE", goal = TutorialRoom.Goal.Reach,
                 body = "Walk onto the baking tray. Henry lies back and rides it all the way down to the floor.",
                 keys = new[] { "W" }, area = Area(2f, 128f, 8f), gate = gates[4], respawn = Respawn("Respawn Slide", deck + 1f, 96f) },
-            new TutorialRoom.Lesson { icon = Glyph("frozen"), title = "ICE", goal = TutorialRoom.Goal.StopOn,
-                body = "Ice is slippery! Henry keeps sliding after you let go and turns slowly. Glide round the pillars and come to a stop on the blue square.",
-                keys = new[] { "WASD" }, area = new Bounds(P(0, 1.5f, 179f), new Vector3(8f, 3f, 6f)), gate = gates[5], respawn = Respawn("Respawn Ice", 1f, 134f) },
+            new TutorialRoom.Lesson { icon = Glyph("frozen"), title = "ICE", goal = TutorialRoom.Goal.Reach,
+                body = "Ice is slippery! Henry keeps sliding after you let go and turns slowly. Glide round the pillars and walk across to the far end.",
+                keys = new[] { "WASD" }, area = Area(2f, 186f, 4f), gate = gates[5], respawn = Respawn("Respawn Ice", 1f, 134f) },
         };
         root.gameObject.AddComponent<TutorialRoom>().Setup(start, box != null ? box.GetComponent<Carryable>() : null, lessons.ToArray(), Glyph("check"));
     }

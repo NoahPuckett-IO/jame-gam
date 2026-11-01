@@ -123,6 +123,10 @@ static class DevBridge
             case "matkw": PerfProbe.MatKeywords(arg); break;
             case "combinecensus": PerfProbe.CombineCensus(arg); break;
             case "mergecheck": PerfProbe.MergeCheck(); break;
+            case "matscan": MatScan(arg); break;
+            case "matusers": MatUsers(arg); break;
+            case "seals": Seals(); break;
+            case "bg": PlayingOnly(); Application.runInBackground = true; break;
             default: throw new System.Exception("unknown command");
         }
     }
@@ -302,6 +306,53 @@ static class DevBridge
                     if (m != null)
                         sb.AppendLine($"{path} {r.name}: {m.name} shader={m.shader.name} color={(m.HasProperty("_BaseColor") ? m.GetColor("_BaseColor") : m.color)} tex={(m.mainTexture != null ? AssetDatabase.GetAssetPath(m.mainTexture) : "-")}");
         File.WriteAllText(System.IO.Path.Combine(Root, "matinfo.txt"), sb.ToString());
+    }
+
+    // matscan [filter]: every material on a scene renderer (under objects whose path contains filter), glossiest
+    // first, with its shader, smoothness, metallic and how many renderers use it, into matscan.txt
+    static void MatScan(string filter)
+    {
+        var uses = new Dictionary<Material, (int count, string example)>();
+        foreach (var r in Object.FindObjectsByType<Renderer>(FindObjectsInactive.Include))
+        {
+            if (!r.gameObject.scene.IsValid()) continue;
+            string path = null;
+            if (filter.Length > 0 && !(path = PathOf(r.transform)).Contains(filter)) continue;
+            foreach (var m in r.sharedMaterials)
+            {
+                if (m == null) continue;
+                uses.TryGetValue(m, out var u);
+                uses[m] = (u.count + 1, u.example ?? path ?? PathOf(r.transform));
+            }
+        }
+        float Get(Material m, string p) => m.HasProperty(p) ? m.GetFloat(p) : -1f;
+        var lines = uses.OrderByDescending(kv => Get(kv.Key, "_Smoothness") + Get(kv.Key, "_Metallic"))
+            .Select(kv => $"{Get(kv.Key, "_Smoothness"):0.00} sm  {Get(kv.Key, "_Metallic"):0.00} met  {kv.Value.count,5}x  {kv.Key.name}  [{kv.Key.shader.name}] {AssetDatabase.GetAssetPath(kv.Key)}  e.g. {kv.Value.example}");
+        File.WriteAllText(System.IO.Path.Combine(Root, "matscan.txt"), string.Join("\n", lines));
+    }
+
+    // seals: every invisible wall (solid collider on Ignore Raycast with no renderer of its own), grouped by name, with
+    // how many there are and where, into seals.txt
+    static void Seals()
+    {
+        var lines = Object.FindObjectsByType<Collider>(FindObjectsInactive.Include)
+            .Where(c => c.gameObject.scene.IsValid() && !c.isTrigger && c.GetComponent<Renderer>() == null && c.gameObject.layer == 2)
+            .GroupBy(c => c.name)
+            .OrderByDescending(g => g.Count())
+            .Select(g => $"{g.Count(),4}  {g.Key}\n" + string.Join("\n", g.Take(12).Select(c =>
+                $"        {PathOf(c.transform.parent)}  min={c.bounds.min:F1} max={c.bounds.max:F1}")));
+        File.WriteAllText(System.IO.Path.Combine(Root, "seals.txt"), string.Join("\n", lines));
+    }
+
+    // matusers Name: the scene renderers using a material of that name, grouped by their parent path, into matusers.txt
+    static void MatUsers(string name)
+    {
+        var groups = Object.FindObjectsByType<Renderer>(FindObjectsInactive.Include)
+            .Where(r => r.gameObject.scene.IsValid() && r.sharedMaterials.Any(m => m != null && m.name == name))
+            .GroupBy(r => r.transform.parent != null ? PathOf(r.transform.parent) : "(root)")
+            .OrderByDescending(g => g.Count())
+            .Select(g => $"{g.Count(),5}  {g.Key}  e.g. {g.First().name}");
+        File.WriteAllText(System.IO.Path.Combine(Root, "matusers.txt"), string.Join("\n", groups));
     }
 
     static void ModelSheet(string[] paths)

@@ -54,6 +54,8 @@ static partial class GroceryStoreBuilder
 
         // no dropping off the front of the top back onto board 3, and no walking from the first patch to the plane's
         Seal(root, "Shelf Top Guard", new Vector3(face + 0.1f, T + 1.7f, (L1TopFrom + L1TopTo) / 2), new Vector3(0.6f, 4f, L1TopTo - L1TopFrom));
+        // the guard shows as a wire shelf fence along the edge, open where the ladders come up and the plane takes off
+        TopFence(root, face - 0.15f, T, new[] { (L1TopFrom, -6.6f), (-3.4f, 5.4f), (8.6f, 13.4f), (21.5f, L1TopTo) });
         Seal(root, "Shelf Top Divider", new Vector3((hx + face + 0.4f) / 2, T + 3f, L1TopSplit), new Vector3(face + 0.4f - hx, 6.6f, 1f));
         // a tipped-over cereal box shows where the divider is
         var divider = CerealBox(root, 3, 0.62f);
@@ -73,6 +75,28 @@ static partial class GroceryStoreBuilder
         ShelfLadder(root, hall, 7f);
     }
 
+    // a wire fence along the front of a shelf top: posts with a top and a middle rail, in runs from z to z.
+    // Decoration only (the guard seal does the blocking), and plain static boxes so the merge can batch it
+    static void TopFence(Transform parent, float x, float y, (float z0, float z1)[] runs)
+    {
+        var root = new GameObject("Shelf Top Fence").transform;
+        root.SetParent(parent);
+        var wire = GetMaterial("Shelf Fence", new Color(0.55f, 0.57f, 0.6f));
+        wire.SetFloat("_Metallic", 0.5f);
+        wire.SetFloat("_Smoothness", 0.4f);
+        const float h = 2.8f, post = 0.14f;
+        void Part(Vector3 at, Vector3 size) => Object.DestroyImmediate(Box2("Fence Wire", root, at, size, wire).GetComponent<Collider>());
+        foreach (var (z0, z1) in runs)
+        {
+            float len = z1 - z0;
+            int n = Mathf.Max(1, Mathf.RoundToInt(len / 2.4f));
+            for (int i = 0; i <= n; i++)
+                Part(new Vector3(x, y + h / 2, z0 + i * len / n), new Vector3(post, h, post));
+            Part(new Vector3(x, y + h, (z0 + z1) / 2), new Vector3(post * 1.3f, post * 1.3f, len));
+            Part(new Vector3(x, y + h * 0.5f, (z0 + z1) / 2), new Vector3(post, post, len));
+        }
+    }
+
     // a ladder stood on board 3 against the back panel, up to the shelf top (and back down)
     static Transform ShelfLadder(Transform parent, Hall hall, float z)
     {
@@ -80,16 +104,18 @@ static partial class GroceryStoreBuilder
         return KitLadder(parent, new Vector3(face, 0, z), Vector3.right, hall.h3, hall.top, new Vector3(face - 2.4f, hall.top, z), down: true);
     }
 
-    // a cereal box tipped over across board 3, from the back panel to the edge and nearly up to the shelf top, with an
-    // invisible wall that reaches well out over the aisle so it can't be jumped round
+    // a cereal box tipped over across board 3, from the back panel to past the edge and nearly up to the shelf top,
+    // with an invisible wall that reaches well out over the aisle so it can't be jumped round. It juts a little way
+    // out over the drop, so that wall isn't all air
     static void CubbyWall(Transform parent, Hall hall, float z, int style)
     {
+        const float overhang = 2.4f;
         float h = (hall.top - hall.h3) * 0.92f, face = hall.xW - hall.back;
         var box = CerealBox(parent, style);
         box.name = "Cubby Wall";
         box.transform.rotation = Quaternion.Euler(0, 0, 90);
-        box.transform.localScale = new Vector3(h / CerealW, (hall.back - 0.3f) / CerealH, 1f);
-        PlaceOnFloor(box, new Vector3(hall.xW - hall.back / 2, hall.h3, z));
+        box.transform.localScale = new Vector3(h / CerealW, (hall.back - 0.3f + overhang) / CerealH, 1f);
+        PlaceOnFloor(box, new Vector3(hall.xW - hall.back / 2 + overhang / 2, hall.h3, z));
         float x0 = face - 0.3f, x1 = hall.xW + 7f, y0 = hall.h3 - 1f, y1 = hall.top - 0.3f;
         Seal(parent, "Cubby Wall Seal", new Vector3((x0 + x1) / 2, (y0 + y1) / 2, z), new Vector3(x1 - x0, y1 - y0, CerealD + 0.2f));
     }

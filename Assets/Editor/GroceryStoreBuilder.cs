@@ -83,6 +83,7 @@ static partial class GroceryStoreBuilder
         Box("Wall S", store.transform, new Vector3(0, WallHeight / 2, -(depth + wallT) / 2), new Vector3(width, WallHeight, wallT), wallMat);
         Box("Wall E", store.transform, new Vector3(right + wallT / 2, WallHeight / 2, 0), new Vector3(wallT, WallHeight, depth), wallMat);
         BuildWestWallAndDoor(store.transform, left - wallT / 2, wallT, depth, wallMat);
+        CoveBase(store.transform, left, right, depth);
 
         devWarps.Clear();
         settleQueue.Clear();
@@ -200,6 +201,7 @@ static partial class GroceryStoreBuilder
         SealShelves(store.transform, walkways, shelf, aisleLength);
         AddGrime(store.transform, left, right, depth);
         MakeProductsMatte(store.transform);
+        TuneFinishes();
         BuildTutorialRoom(store.transform);
         AddPickupOutlines(store.transform);
 
@@ -384,6 +386,23 @@ static partial class GroceryStoreBuilder
         sun.shadows = LightShadows.Soft;
     }
 
+    // the dark vinyl skirting along the foot of every wall, broken for the doorway, so the walls don't just stop
+    // dead at the floor
+    static void CoveBase(Transform store, float left, float right, float depth)
+    {
+        var root = new GameObject("Cove Base").transform;
+        root.SetParent(store);
+        var vinyl = GetMaterial("Cove Base", new Color(0.2f, 0.21f, 0.23f));
+        vinyl.SetFloat("_Smoothness", 0.35f);
+        float h = 0.12f * Scale, t = 0.3f, width = right - left, side = (depth - DoorWidth) / 2;
+        void Strip(Vector3 at, Vector3 size) => Object.DestroyImmediate(Box2("Cove Base", root, at + Vector3.up * h / 2, size, vinyl).GetComponent<Collider>());
+        Strip(new Vector3((left + right) / 2, 0, depth / 2 - t / 2), new Vector3(width, h, t));
+        Strip(new Vector3((left + right) / 2, 0, -depth / 2 + t / 2), new Vector3(width, h, t));
+        Strip(new Vector3(right - t / 2, 0, 0), new Vector3(t, h, depth));
+        foreach (int s in new[] { -1, 1 })
+            Strip(new Vector3(left + t / 2, 0, s * (DoorWidth + side) / 2), new Vector3(t, h, side));
+    }
+
     static void BuildCheckout(Transform store, float left, float depth)
     {
         var area = new GameObject("Checkout").transform;
@@ -461,24 +480,36 @@ static partial class GroceryStoreBuilder
 
     static Material FloorTiles(float width, float depth)
     {
+        // four by four tiles to a texture so the little differences between tiles don't repeat every other tile:
+        // each tile a touch lighter or darker and faintly mottled, worn a little paler towards its middle, with dirty
+        // grout and a hairline catch of light on two edges
         const string texPath = MatFolder + "/FloorTiles.png";
+        const int tilesPer = 4;
         if (AssetDatabase.LoadAssetAtPath<Texture2D>(texPath) == null)
         {
-            const int size = 256, half = size / 2;
-            var tex = new Texture2D(size, size, TextureFormat.RGB24, false);
+            const int cell = 128, size = cell * tilesPer;
+            var tex = new Texture2D(size, size, TextureFormat.RGB24, true);
             var rng = new System.Random(3);
             var light = new Color(0.86f, 0.86f, 0.83f);
             var dark = new Color(0.62f, 0.64f, 0.66f);
+            var tint = new float[tilesPer, tilesPer];
+            for (int i = 0; i < tilesPer; i++)
+                for (int j = 0; j < tilesPer; j++)
+                    tint[i, j] = 0.965f + 0.05f * (float)rng.NextDouble();
             for (int y = 0; y < size; y++)
             for (int x = 0; x < size; x++)
             {
-                bool checker = (x < half) ^ (y < half);
-                var c = checker ? light : dark;
+                int tx = x / cell, ty = y / cell, lx = x % cell, ly = y % cell;
+                var c = ((tx + ty) % 2 == 0 ? light : dark) * tint[tx, ty];
+                float mottle = Fbm(x / 22f, y / 22f, 17);
+                c *= 0.975f + 0.05f * mottle;
+                float fromMiddle = Mathf.Max(Mathf.Abs(lx - cell / 2f), Mathf.Abs(ly - cell / 2f)) / (cell / 2f);
+                c *= 1f + 0.025f * (1f - fromMiddle * fromMiddle);
                 float speck = (float)rng.NextDouble();
-                if (speck > 0.97f) c *= 0.8f;
-                else if (speck < 0.02f) c = Color.Lerp(c, Color.white, 0.5f);
-                c *= 0.97f + 0.03f * (float)rng.NextDouble();
-                if (x % half < 2 || y % half < 2) c *= 0.7f;
+                if (speck > 0.975f) c *= 0.82f;
+                else if (speck < 0.015f) c = Color.Lerp(c, Color.white, 0.45f);
+                if (lx < 2 || ly < 2) c = c * 0.62f + new Color(0.03f, 0.025f, 0.02f) * Fbm(x / 6f, y / 6f, 23);
+                else if (lx == 2 || ly == 2) c *= 1.06f;
                 tex.SetPixel(x, y, c);
             }
             System.IO.File.WriteAllBytes(texPath, tex.EncodeToPNG());
@@ -491,20 +522,20 @@ static partial class GroceryStoreBuilder
         mat.SetTexture("_BaseMap", map);
         mat.color = Color.white;
         float tile = 0.3f * Scale;
-        mat.SetTextureScale("_BaseMap", new Vector2(width / (2 * tile), depth / (2 * tile)));
-        mat.SetFloat("_Smoothness", 0.55f);
+        mat.SetTextureScale("_BaseMap", new Vector2(width / (tilesPer * tile), depth / (tilesPer * tile)));
+        mat.SetFloat("_Smoothness", 0.42f);
         EditorUtility.SetDirty(mat);
         return mat;
     }
 
-    static void HangAisleSign(Transform store, float x, float z, int number, string label, int damage = 0)
+    static void HangAisleSign(Transform store, float x, float z, int number, string label, int damage = 0, string subtitle = null, string icon = null)
     {
         var sign = new GameObject($"Aisle Sign {number}").transform;
         sign.SetParent(store);
         sign.position = new Vector3(x, WallHeight - 1.1f * Scale, z);
 
         BacklitSign(sign, sign.position, Vector3.back, 1.7f * Scale, 0.6f * Scale, label, new Color(0.12f, 0.35f, 0.62f),
-            twoSided: true, subtitle: AisleSubtitles[number - 1], iconRight: AisleIcons[number - 1],
+            twoSided: true, subtitle: subtitle ?? AisleSubtitles[number - 1], iconRight: icon ?? AisleIcons[number - 1],
             iconLeft: "");
         var disc = GetMaterial("SignDisc", Color.white);
         foreach (var n in new[] { Vector3.back, Vector3.forward })
@@ -546,7 +577,7 @@ static partial class GroceryStoreBuilder
         {
             sign.rotation = Quaternion.Euler(80f, 14f, 0f);
             var b = GetBounds(sign.gameObject);
-            sign.position += new Vector3(0.4f * Scale - (b.center.x - x), -b.min.y, -0.9f * Scale - (b.center.z - z));
+            sign.position += new Vector3(0.4f * Scale - (b.center.x - x), -b.min.y, -1.1f * Scale - (b.center.z - z));
             Box("Snapped Wire", store, top + Vector3.left * 0.6f * Scale + Vector3.up * wireLen * 0.8f,
                 new Vector3(0.01f * Scale, wireLen * 0.4f, 0.01f * Scale), wireMat);
             Box("Snapped Wire", store, top + Vector3.right * 0.6f * Scale + Vector3.up * wireLen * 0.85f,
@@ -734,18 +765,31 @@ static partial class GroceryStoreBuilder
         public float size;
         public float yaw;
         public Vector3 bounds;
+        public Quaternion tilt = Quaternion.identity;   // laid on its side before the yaw
     }
+
+    // models that come standing on a point (a cone, a bone, a stick, a carrot's tip): stocked and dropped lying down
+    static readonly HashSet<string> LieDown = new HashSet<string> { "ChickenLeg", "popsicle", "ice-cream", "carrot" };
 
     static ProductType MeasureProduct(GameObject prefab, float realSize)
     {
-        var go = Spawn(prefab, null, 0, 1);
+        var t = new ProductType { prefab = prefab, size = realSize * Scale };
+        if (LieDown.Contains(prefab.name)) t.tilt = Quaternion.Euler(90f, 0f, 0f);
+        var go = SpawnProduct(t, null, 0, 1);
         var b = GetBounds(go);
-        float yaw = b.size.x > b.size.z ? 90 : 0;
+        t.yaw = b.size.x > b.size.z ? 90 : 0;
         Object.DestroyImmediate(go);
-        go = Spawn(prefab, null, yaw, 1);
-        var size = GetBounds(go).size;
+        go = SpawnProduct(t, null, t.yaw, 1);
+        t.bounds = GetBounds(go).size;
         Object.DestroyImmediate(go);
-        return new ProductType { prefab = prefab, size = realSize * Scale, yaw = yaw, bounds = size };
+        return t;
+    }
+
+    static GameObject SpawnProduct(ProductType t, Transform parent, float yaw, float scale)
+    {
+        var go = Spawn(t.prefab, parent, yaw, scale);
+        go.transform.rotation = Quaternion.Euler(0, yaw, 0) * t.tilt * t.prefab.transform.rotation;
+        return go;
     }
 
     static void StockAisle(Transform aisle, ShelfInfo shelf, float aisleLength, (string model, float size)[] stock, int[] sides = null)
@@ -867,7 +911,7 @@ static partial class GroceryStoreBuilder
                     if (InNoStockZone(new Vector3(px, y + 1f, zc))) continue;
                     if (!HasSurface(upTris, px, zc - w * 0.4f, y) || !HasSurface(upTris, px, zc + w * 0.4f, y)) continue;
 
-                    var p = Spawn(type.prefab, parent, type.yaw + (side > 0 ? 0 : 180), s * rand(0.93f, 1f));
+                    var p = SpawnProduct(type, parent, type.yaw + (side > 0 ? 0 : 180), s * rand(0.93f, 1f));
                     // knocked over: only squat upright things (cans, jars) whose lying length still fits their slot. A dish on
                     // its edge looks placed, and a tall bottle lying down pokes through its neighbours
                     bool tipped = rng.NextDouble() < 0.025 && bnd.y * s < w * 1.2f && bnd.y > Mathf.Max(bnd.x, bnd.z) * 0.9f;
@@ -956,7 +1000,7 @@ static partial class GroceryStoreBuilder
             {
                 var t = types[rng.Next(types.Count)];
                 float s = t.size / Mathf.Max(t.bounds.x, t.bounds.y, t.bounds.z);
-                var p = Spawn(t.prefab, pile, t.yaw + Rand(0f, 360f), s);
+                var p = SpawnProduct(t, pile, t.yaw + Rand(0f, 360f), s);
                 if (tumble) p.transform.rotation = Quaternion.Euler(Rand(0f, 360f), Rand(0f, 360f), Rand(0f, 360f)) * p.transform.rotation;
                 PlaceOnFloor(p, at);
                 AddBoxColliders(p);

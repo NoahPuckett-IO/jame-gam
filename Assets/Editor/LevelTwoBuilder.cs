@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using UnityEditor;
 using UnityEngine;
 
 static partial class GroceryStoreBuilder
@@ -117,6 +118,7 @@ static partial class GroceryStoreBuilder
         CanStairs(root, new Vector3(hall.xE - 1.4f, 0, -zN + 2.5f), Vector3.left, 5, hall.h1, descendingFromBoard: true);
 
         WetFloorSign(root, new Vector3(hall.x - 6f, 0, zN - 6f), 200f);
+        MopBucket(root, new Vector3(hall.x + 12f, 0, zN - 4f), 35f);
         WetFloorSign(root, new Vector3(hall.x + 9f, 0, -zN + 3f), -20f);
     }
 
@@ -348,13 +350,34 @@ static partial class GroceryStoreBuilder
         col.transform.SetParent(root);
         col.transform.SetPositionAndRotation(mid, Quaternion.LookRotation(b - a));
         col.size = new Vector3(2f, 0.9f, (b - a).magnitude);
-        var head = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        head.name = "Mop Head";
-        head.transform.SetParent(root);
-        head.transform.SetPositionAndRotation(b + Vector3.down * 1.5f, Quaternion.Euler(0, 0, 8));
-        head.transform.localScale = new Vector3(3.2f, 1.6f, 3.2f);
-        head.GetComponent<Renderer>().sharedMaterial = GetMaterial("Mop Strands", new Color(0.85f, 0.85f, 0.78f));
-        Object.DestroyImmediate(head.GetComponent<Collider>());
+        // the head lies on the far board: a plastic socket on the end of the handle and the strands fanned out
+        // flat from it (it used to be a drum sunk halfway through the board)
+        var dir = (b - a).normalized;
+        var across = Vector3.Cross(Vector3.up, dir);
+        var socketAt = b + dir * 0.5f + Vector3.up * 0.45f;
+        var socket = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        socket.name = "Mop Socket";
+        socket.transform.SetParent(root);
+        socket.transform.SetPositionAndRotation(socketAt, Quaternion.FromToRotation(Vector3.up, dir));
+        socket.transform.localScale = new Vector3(1.4f, 0.7f, 1.4f);
+        socket.GetComponent<Renderer>().sharedMaterial = GetMaterial("Mop Socket", new Color(0.85f, 0.2f, 0.15f));
+        Object.DestroyImmediate(socket.GetComponent<Collider>());
+        var strands = GetMaterial("Mop Strands", new Color(0.85f, 0.85f, 0.78f));
+        for (int i = 0; i < 18; i++)
+        {
+            float k = i / 17f;
+            var fan = Quaternion.AngleAxis(Mathf.Lerp(-38f, 38f, k) + Mathf.Sin(i * 2.3f) * 5f, Vector3.up) * dir;
+            float len = 3.2f + Mathf.Abs(Mathf.Sin(i * 1.7f)) * 1.2f;
+            var start = socketAt + dir * 0.6f + across * (k - 0.5f) * 0.9f;
+            var end = new Vector3(start.x, b.y + 0.18f + (i % 3) * 0.1f, start.z) + fan * len;
+            var s = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            s.name = "Strand";
+            s.transform.SetParent(root);
+            s.transform.SetPositionAndRotation((start + end) / 2, Quaternion.LookRotation(end - start));
+            s.transform.localScale = new Vector3(0.36f, 0.28f, (end - start).magnitude);
+            s.GetComponent<Renderer>().sharedMaterial = strands;
+            Object.DestroyImmediate(s.GetComponent<Collider>());
+        }
     }
 
     static void Sponge(Transform parent, Vector3 topAt, float launch)
@@ -376,7 +399,7 @@ static partial class GroceryStoreBuilder
         root.gameObject.AddComponent<BouncePad>().Setup(launch, visual);
     }
 
-    static void Slide(Transform parent, Vector3 top, Vector3 bottom, float width, float exitSpeed = 10f)
+    static void Slide(Transform parent, Vector3 top, Vector3 bottom, float width, float exitSpeed = 10f, float ceiling = WallHeight)
     {
         var root = new GameObject("Baking Tray Slide").transform;
         root.SetParent(parent);
@@ -384,8 +407,8 @@ static partial class GroceryStoreBuilder
         root.SetPositionAndRotation((top + bottom) / 2, Quaternion.LookRotation(dir));
         float len = dir.magnitude + 2f;
         var tray = GetMaterial("Baking Tray", new Color(0.62f, 0.64f, 0.66f));
-        tray.SetFloat("_Metallic", 0.7f);
-        tray.SetFloat("_Smoothness", 0.55f);
+        tray.SetFloat("_Metallic", 0.65f);
+        tray.SetFloat("_Smoothness", 0.42f);
         void Part(string name, Vector3 local, Vector3 size)
         {
             var p = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -404,7 +427,7 @@ static partial class GroceryStoreBuilder
         foreach (float rim in new[] { -1f, 1f })
         {
             var at = root.TransformPoint(new Vector3(rim * width / 2, 1f, f * len));
-            float h = WallHeight - at.y;
+            float h = ceiling - at.y;
             Box("Wire", parent, at + Vector3.up * h / 2, new Vector3(0.12f, h, 0.12f), wire);
         }
 
@@ -420,30 +443,94 @@ static partial class GroceryStoreBuilder
     {
         var root = new GameObject("Soda Spill").transform;
         root.SetParent(parent);
-        var puddle = StoreAtmosphere.Glass("Soda Puddle", new Color(0.85f, 0.35f, 0.05f, 0.6f));
-        puddle.SetFloat("_Smoothness", 0.95f);
+        var splats = new Material[3];
+        for (int v = 0; v < splats.Length; v++) splats[v] = SplatMaterial("Soda", new Color(0.86f, 0.42f, 0.08f), new Color(0.5f, 0.2f, 0.04f), 0.74f, v);
+        // irregular puddles with a dried sugary rim, half as many and bigger than the old discs so they read as one
+        // sticky mess instead of a stack of see-through circles (the rolls stay the same so the rest of the level
+        // lays out as before)
         for (int i = 0; i < 26; i++)
         {
             float z = Mathf.Lerp(z0, z1, (i + (float)rng.NextDouble()) / 26f);
             float s = 8f + (float)rng.NextDouble() * 10f;
-            var q = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            float x = xc + ((float)rng.NextDouble() - 0.5f) * width * 0.7f;
+            float stretch = 0.6f + (float)rng.NextDouble() * 0.6f;
+            float yaw = (float)rng.NextDouble() * 360f;
+            if (i % 2 == 1) continue;
+            var q = GameObject.CreatePrimitive(PrimitiveType.Quad);
             q.name = "Puddle";
             q.transform.SetParent(root);
-            q.transform.position = new Vector3(xc + ((float)rng.NextDouble() - 0.5f) * width * 0.7f, 0.03f, z);
-            q.transform.localScale = new Vector3(s, 0.01f, s * (0.6f + (float)rng.NextDouble() * 0.6f));
-            q.transform.rotation = Quaternion.Euler(0, (float)rng.NextDouble() * 360f, 0);
-            q.GetComponent<Renderer>().sharedMaterial = puddle;
+            q.transform.SetPositionAndRotation(new Vector3(x, 0.025f + i * 0.0015f, z), Quaternion.Euler(90, yaw, 0));
+            q.transform.localScale = new Vector3(s * 1.7f, s * 1.7f * stretch, 1f);
+            var r = q.GetComponent<Renderer>();
+            r.sharedMaterial = splats[i / 2 % splats.Length];
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             Object.DestroyImmediate(q.GetComponent<Collider>());
         }
         var bottles = Measure(new[] { ("k:soda-bottle", 0.3f), ("k:soda-can", 0.12f), ("k:soda", 0.2f), ("k:soda-can-crushed", 0.1f) });
         for (int i = 0; i < 18 && bottles.Count > 0; i++)
         {
             var t = bottles[rng.Next(bottles.Count)];
-            var p = Spawn(t.prefab, root, (float)rng.NextDouble() * 360f, t.size / Mathf.Max(t.bounds.x, t.bounds.y, t.bounds.z));
+            var p = SpawnProduct(t, root, (float)rng.NextDouble() * 360f, t.size / Mathf.Max(t.bounds.x, t.bounds.y, t.bounds.z));
             p.transform.rotation = Quaternion.Euler(90, (float)rng.NextDouble() * 360f, 0) * p.transform.rotation;
             PlaceOnFloor(p, new Vector3(xc + ((float)rng.NextDouble() - 0.5f) * width * 0.8f, 0, Mathf.Lerp(z0, z1, (float)rng.NextDouble())));
             SettleLater(p);
         }
+    }
+
+    // a spilled-drink puddle: a lumpy blob with a darker dried edge and a few drips thrown off it
+    static Material SplatMaterial(string kind, Color body, Color rim, float opacity, int variant)
+    {
+        if (!AssetDatabase.IsValidFolder(GrimeFolder)) AssetDatabase.CreateFolder(MatFolder, "Grime");
+        string texPath = $"{GrimeFolder}/{kind}_{variant}.png";
+        if (AssetDatabase.LoadAssetAtPath<Texture2D>(texPath) == null)
+        {
+            const int size = 512;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, true);
+            var rng = new System.Random(variant * 541 + 9);
+            int seed = variant * 77 + 21;
+            var drops = new List<Vector3>();
+            for (int i = 0; i < 7 + variant * 2; i++)
+            {
+                float a = (float)rng.NextDouble() * Mathf.PI * 2, d = 0.72f + (float)rng.NextDouble() * 0.22f;
+                drops.Add(new Vector3(Mathf.Cos(a) * d, Mathf.Sin(a) * d, 0.03f + (float)rng.NextDouble() * 0.06f));
+            }
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float u = (x / (float)size - 0.5f) * 2f, v = (y / (float)size - 0.5f) * 2f;
+                float wu = u + (Fbm(x / 90f, y / 90f, seed) - 0.5f) * 0.7f;
+                float wv = v + (Fbm(x / 90f + 7f, y / 90f + 3f, seed) - 0.5f) * 0.7f;
+                float r = Mathf.Sqrt(wu * wu + wv * wv) / 0.62f;
+                float inside = Mathf.Clamp01((1f - r) * 14f);
+                float edge = Mathf.Exp(-Mathf.Pow((r - 0.96f) * 16f, 2f));
+                float drop = 0f;
+                foreach (var dr in drops)
+                {
+                    float dd = Mathf.Sqrt((u - dr.x) * (u - dr.x) + (v - dr.y) * (v - dr.y)) / dr.z;
+                    drop = Mathf.Max(drop, Mathf.Clamp01((1f - dd) * 6f));
+                }
+                float fine = Fbm(x / 14f, y / 14f, seed + 5);
+                float a = Mathf.Max(inside * (opacity - 0.06f + 0.12f * fine), drop * opacity);
+                a = Mathf.Max(a, edge * 0.85f * Mathf.Clamp01(inside + 0.4f));
+                var c = Color.Lerp(body * (0.9f + 0.2f * fine), rim, Mathf.Clamp01(edge * 1.2f));
+                c.a = Mathf.Clamp01(a);
+                tex.SetPixel(x, y, c);
+            }
+            System.IO.File.WriteAllBytes(texPath, tex.EncodeToPNG());
+            Object.DestroyImmediate(tex);
+            AssetDatabase.ImportAsset(texPath);
+            if (AssetImporter.GetAtPath(texPath) is TextureImporter ti)
+            {
+                ti.alphaIsTransparency = true;
+                ti.wrapMode = TextureWrapMode.Clamp;
+                ti.SaveAndReimport();
+            }
+        }
+        var mat = StoreAtmosphere.Glass($"{kind} Splat {variant}", Color.white);
+        mat.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(texPath));
+        mat.SetFloat("_Smoothness", 0.9f);
+        EditorUtility.SetDirty(mat);
+        return mat;
     }
 
     static void WetFloorSign(Transform parent, Vector3 floorAt, float yaw)
@@ -466,5 +553,72 @@ static partial class GroceryStoreBuilder
             MakeText(root, root.TransformPoint(new Vector3(0, h * 0.55f, s * (h * 0.12f + 0.25f))), textYaw, "CAUTION\nWET FLOOR", w * 0.8f, h * 0.3f, Color.black, lit: true);
             MakeIcon(root, root.TransformPoint(new Vector3(0, h * 0.25f, s * (h * 0.12f + 0.2f))), textYaw, "walk", w * 0.45f, Color.black, lit: true);
         }
+    }
+
+    // the cleaner's yellow mop bucket on castors, grey water in it and the wringer on one side; one box collider
+    static void MopBucket(Transform parent, Vector3 floorAt, float yaw)
+    {
+        var root = new GameObject("Mop Bucket").transform;
+        root.SetParent(parent);
+        root.SetPositionAndRotation(floorAt, Quaternion.Euler(0, yaw, 0));
+        var yellow = GetMaterial("Caution Yellow", new Color(1f, 0.82f, 0.05f));
+        var grey = GetMaterial("Bucket Grey", new Color(0.32f, 0.33f, 0.35f));
+        var water = GetMaterial("Mop Water", new Color(0.36f, 0.4f, 0.38f));
+        water.SetFloat("_Smoothness", 0.85f);
+        const float r = 4.6f, h = 6.4f, wheel = 0.9f;
+        void Part(PrimitiveType type, string name, Vector3 local, Vector3 scale, Material m, Vector3 euler = default)
+        {
+            var g = GameObject.CreatePrimitive(type);
+            g.name = name;
+            g.transform.SetParent(root, false);
+            g.transform.localPosition = local;
+            g.transform.localRotation = Quaternion.Euler(euler);
+            g.transform.localScale = scale;
+            g.GetComponent<Renderer>().sharedMaterial = m;
+            Object.DestroyImmediate(g.GetComponent<Collider>());
+            g.isStatic = true;
+        }
+        Part(PrimitiveType.Cylinder, "Bucket", new Vector3(0, wheel + h / 2, 0), new Vector3(r * 2, h / 2, r * 2), yellow);
+        Part(PrimitiveType.Cylinder, "Rim", new Vector3(0, wheel + h, 0), new Vector3(r * 2 + 0.4f, 0.15f, r * 2 + 0.4f), yellow);
+        Part(PrimitiveType.Cylinder, "Water", new Vector3(0, wheel + h - 0.5f, 0), new Vector3(r * 2 - 0.5f, 0.05f, r * 2 - 0.5f), water);
+        foreach (var (wx, wz) in new[] { (-1, -1), (-1, 1), (1, -1), (1, 1) })
+            Part(PrimitiveType.Cylinder, "Castor", new Vector3(wx * r * 0.65f, wheel / 2, wz * r * 0.65f), new Vector3(wheel, 0.3f, wheel), grey, new Vector3(0, 0, 90));
+        Part(PrimitiveType.Cube, "Wringer", new Vector3(0, wheel + h + 1.4f, r * 0.55f), new Vector3(r * 1.3f, 2.8f, r * 0.7f), grey);
+        Part(PrimitiveType.Cube, "Wringer Lever", new Vector3(r * 0.6f, wheel + h + 4.2f, r * 0.55f), new Vector3(0.35f, 5.5f, 0.35f), grey, new Vector3(0, 0, -12));
+        var col = root.gameObject.AddComponent<BoxCollider>();
+        col.center = new Vector3(0, (wheel + h + 2.8f) / 2, 0);
+        col.size = new Vector3(r * 2, wheel + h + 2.8f, r * 2);
+    }
+
+    // a push broom dropped flat on the floor, bristles down, from its head at `head` along `along`
+    static void Broom(Transform parent, Vector3 head, Vector3 along)
+    {
+        var root = new GameObject("Broom").transform;
+        root.SetParent(parent);
+        along = new Vector3(along.x, 0, along.z).normalized;
+        var across = Vector3.Cross(Vector3.up, along);
+        var wood = GetMaterial("Broom Handle", new Color(0.72f, 0.52f, 0.3f));
+        var block = GetMaterial("Broom Block", new Color(0.2f, 0.35f, 0.6f));
+        var bristle = GetMaterial("Vac Bristle", new Color(0.95f, 0.8f, 0.25f));
+        const float len = 22f, radius = 0.4f;
+        Box("Broom Bristles", root, head + Vector3.up * 0.7f, new Vector3(1f, 1.4f, 1f), bristle);
+        var b = root.GetChild(root.childCount - 1);
+        b.rotation = Quaternion.LookRotation(across);
+        b.localScale = new Vector3(1.6f, 1.4f, 7f);
+        Box("Broom Head", root, head + Vector3.up * 1.9f, Vector3.one, block);
+        var h = root.GetChild(root.childCount - 1);
+        h.rotation = Quaternion.LookRotation(across);
+        h.localScale = new Vector3(2f, 1f, 7.4f);
+        // out of the top of the block and down to the floor
+        var from = head + along * 0.9f + Vector3.up * 1.9f;
+        var to = head + along * len + Vector3.up * radius;
+        var stick = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        stick.name = "Broom Handle";
+        stick.transform.SetParent(root);
+        stick.transform.SetPositionAndRotation((from + to) / 2, Quaternion.FromToRotation(Vector3.up, to - from));
+        stick.transform.localScale = new Vector3(radius * 2, (to - from).magnitude / 2, radius * 2);
+        stick.GetComponent<Renderer>().sharedMaterial = wood;
+        Object.DestroyImmediate(stick.GetComponent<Collider>());
+        stick.isStatic = true;
     }
 }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
@@ -79,7 +80,7 @@ static partial class GroceryStoreBuilder
         cube.name = "Carry Ice Cube";
         cube.isStatic = false;
         cube.AddComponent<Carryable>();
-        LowIceWall(root, xE, xE + fDepth + 0.5f, bz + 33f, FreezerHeight, 3f);
+        LowIceWall(root, xE, xE + fDepth - 0.8f, bz + 33f, FreezerHeight, 3f);
         CheckpointAt(root, "Checkpoint L3-C2", new Vector3(xE + fDepth / 2, FreezerHeight, bz + 37f), new Vector3(fDepth, 4, 3), 0);
         devWarps.Add(("Ice Wall", new Vector3(xE + fDepth * 0.5f, FreezerHeight + 1f, bz + 23f), 0));
 
@@ -88,7 +89,7 @@ static partial class GroceryStoreBuilder
         {
             if (i == 0 || i == 2) continue; // keep the checkpoint spots clear
             var t = bags[rng.Next(bags.Count)];
-            var p = Spawn(t.prefab, root, rng.Next(360), t.size / Mathf.Max(t.bounds.x, t.bounds.y, t.bounds.z));
+            var p = SpawnProduct(t, root, rng.Next(360), t.size / Mathf.Max(t.bounds.x, t.bounds.y, t.bounds.z));
             PlaceOnFloor(p, new Vector3(xE + fDepth * (0.3f + 0.4f * (float)rng.NextDouble()), FreezerHeight, bz + 39f + i * 6f));
             AddBoxColliders(p);
         }
@@ -127,12 +128,18 @@ static partial class GroceryStoreBuilder
             else IceCube(root, at, size, bob: 0.35f);
         }
         foreach (float dz in new[] { -6.5f, 6.5f })
+        {
             Seal(root, "Crossing Wall", new Vector3(x, WallHeight / 2, crossZ + dz), new Vector3(WalkwayWidth, WallHeight, 1f));
+            IceSheet(root, new Vector3(x, 0, crossZ + dz), WalkwayWidth, FreezerHeight + 3f);
+        }
         IceBarrier(root, xE, xE + fDepth, crossZ + 6.5f);
         IceBarrier(root, xW - fDepth, xW, crossZ - 6.5f);
         IceBarrier(root, xW - fDepth, xW, crossZ + 17f);
         Seal(root, "Freezer Back East", new Vector3(xE + fDepth + 0.5f, (FreezerHeight + WallHeight) / 2, 0), new Vector3(1f, WallHeight - FreezerHeight, aisleLength));
         Seal(root, "Freezer Back West", new Vector3(xW - fDepth - 0.5f, (FreezerHeight + WallHeight) / 2, 0), new Vector3(1f, WallHeight - FreezerHeight, aisleLength));
+        // the backs of the freezer tops: a riser panel with overstock against it, kept clear of the route's own spots
+        FreezerBack(root, xE + fDepth, +1, zS, zN, new[] { (bz + 20f, crossZ + 10f) }, rng);
+        FreezerBack(root, xW - fDepth, -1, zS, zN, new[] { (bz + 2f, bz + 32f), (crossZ - 8f, crossZ + 22f) }, rng);
         CheckpointAt(root, "Checkpoint L3-D", new Vector3(xW - fDepth / 2, FreezerHeight, crossZ + 4f), new Vector3(fDepth, 4, 4), 0);
 
         Slide(root, new Vector3(xW - 2f, FreezerHeight, crossZ + 12f), new Vector3(x + 10f, 0.4f, zN - 6f), 5f, exitSpeed: 14f);
@@ -202,6 +209,50 @@ static partial class GroceryStoreBuilder
         foreach (var t in handle.GetComponentsInChildren<Transform>()) t.gameObject.isStatic = false;
 
         root.gameObject.AddComponent<Zipline>().Setup(start, end, handle);
+    }
+
+    // a clear sheet of ice frozen up out of the melt water with a ragged row of chunks along its top: what the
+    // crossing's invisible walls used to be. See-through, so the cubes behind it still show
+    static void IceSheet(Transform root, Vector3 floorAt, float width, float height)
+    {
+        const float thick = 1.2f;
+        var sheet = IceCube(root, floorAt + Vector3.up * height / 2, new Vector3(width, height, thick), bob: 0);
+        sheet.name = "Ice Sheet Wall";
+        sheet.transform.rotation = Quaternion.identity;
+        Object.DestroyImmediate(sheet.GetComponent<Collider>());
+        for (int i = 0; i < 5; i++)
+        {
+            float h = 1.6f + (i * 37 % 5) * 0.45f;
+            var chunk = IceCube(root, floorAt + new Vector3((i - 2f) * width / 5f, height + h / 2 - 0.3f, 0), new Vector3(width / 5f * 0.9f, h, thick * 1.6f), bob: 0);
+            chunk.name = "Ice Sheet Chunk";
+            chunk.transform.rotation = Quaternion.Euler(0, (i * 53) % 14 - 7, (i * 29) % 10 - 5);
+            Object.DestroyImmediate(chunk.GetComponent<Collider>());
+        }
+    }
+
+    // the back edge of a freezer top: a riser panel too tall to jump, with stacks of taped overstock boxes against
+    // it except along the stretches the route uses (clear: pairs of z from, z to)
+    static void FreezerBack(Transform root, float xBack, int outward, float z0, float z1, (float from, float to)[] clear, System.Random rng)
+    {
+        var back = new GameObject("Freezer Back").transform;
+        back.SetParent(root);
+        const float riser = 3f, thick = 0.8f;
+        float xc = xBack - outward * thick / 2, len = z1 - z0;
+        Box("Riser", back, new Vector3(xc, FreezerHeight + riser / 2, (z0 + z1) / 2), new Vector3(thick, riser, len), GetMaterial("Freezer Body", new Color(0.82f, 0.86f, 0.9f)));
+        Box("Riser Cap", back, new Vector3(xc, FreezerHeight + riser + 0.1f, (z0 + z1) / 2), new Vector3(thick + 0.2f, 0.2f, len), GetMaterial("Freezer Trim", new Color(0.12f, 0.13f, 0.15f)));
+        float R(float a, float b) => a + (float)rng.NextDouble() * (b - a);
+        for (float z = z0 + 4f; z < z1 - 4f; z += R(7f, 13f))
+        {
+            if (clear.Any(c => z > c.from - 3f && z < c.to + 3f)) continue;
+            // boxes either taller than a jump or stacked two high, so none is a step up to the top of the riser
+            float size = R(3.4f, 4.2f);
+            var at = new Vector3(xBack - outward * (thick + size * 0.5f + R(0.05f, 0.3f)), FreezerHeight, z);
+            var b = CardboardBox(back, BoxKind.Sealed, size, R(-6f, 6f) + rng.Next(2) * 90, at);
+            if (b == null) continue;
+            if (rng.NextDouble() < 0.55)
+                CardboardBox(back, rng.NextDouble() < 0.5 ? BoxKind.Sealed : BoxKind.Ajar, size * R(0.7f, 0.85f), R(-15f, 15f),
+                    new Vector3(at.x + R(-0.2f, 0.2f), GetBounds(b).max.y, z + R(-0.4f, 0.4f)));
+        }
     }
 
     // a wall of ice blocks across a freezer top, just too tall to jump
@@ -425,7 +476,7 @@ static partial class GroceryStoreBuilder
         top.transform.SetParent(root);
         top.transform.position = new Vector3(xc, FreezerHeight + 0.03f, zc);
         top.transform.localScale = new Vector3(depth, 0.06f, len);
-        top.GetComponent<Renderer>().sharedMaterial = IceMaterial();
+        top.GetComponent<Renderer>().sharedMaterial = FrostTopMaterial(depth, len);
         Object.DestroyImmediate(top.GetComponent<Collider>());
         Solid(root, "Freezer Collider", new Vector3(xc, FreezerHeight / 2, zc), new Vector3(depth, FreezerHeight, len));
 
@@ -509,7 +560,7 @@ static partial class GroceryStoreBuilder
                 for (int r = 0; r < rows; r++)
                 {
                     if (rng.NextDouble() < 0.04) continue;
-                    var p = Spawn(t.prefab, parent, t.yaw + (inward > 0 ? 180 : 0) + rand(-4f, 4f), s);
+                    var p = SpawnProduct(t, parent, t.yaw + (inward > 0 ? 180 : 0) + rand(-4f, 4f), s);
                     PlaceOnFloor(p, new Vector3(xFront + inward * (dx / 2 + r * (dx + gap)), y, z + w / 2));
                 }
                 z += w + gap;
@@ -548,6 +599,44 @@ static partial class GroceryStoreBuilder
         var mat = StoreAtmosphere.Glass("Frost", Color.white);
         mat.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(texPath));
         mat.SetFloat("_Smoothness", 0.4f);
+        EditorUtility.SetDirty(mat);
+        return mat;
+    }
+
+    // packed frost on the freezer tops: white crust in patches over pale blue-grey enamel, matte, so the long tops
+    // no longer glare like a sheet of glass under the ceiling lights
+    static Material FrostTopMaterial(float depth, float len)
+    {
+        const string texPath = MatFolder + "/FrostTop.png";
+        if (AssetDatabase.LoadAssetAtPath<Texture2D>(texPath) == null)
+        {
+            const int size = 512;
+            var tex = new Texture2D(size, size, TextureFormat.RGB24, true);
+            var enamel = new Color(0.74f, 0.81f, 0.87f);
+            var crust = new Color(0.95f, 0.97f, 1f);
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float patch = Fbm(x / 70f, y / 70f, 61);
+                float grain = Fbm(x / 9f, y / 9f, 67);
+                float k = Mathf.Clamp01((patch - 0.42f) * 3f) * (0.75f + 0.25f * grain);
+                tex.SetPixel(x, y, Color.Lerp(enamel, crust, k) * (0.96f + 0.04f * grain));
+            }
+            System.IO.File.WriteAllBytes(texPath, tex.EncodeToPNG());
+            Object.DestroyImmediate(tex);
+            AssetDatabase.ImportAsset(texPath);
+            // mirrored tiling hides the seams without having to make the noise itself repeat
+            if (AssetImporter.GetAtPath(texPath) is TextureImporter ti)
+            {
+                ti.wrapMode = TextureWrapMode.Mirror;
+                ti.SaveAndReimport();
+            }
+        }
+        var mat = GetMaterial("Frost Top", Color.white);
+        mat.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(texPath));
+        mat.color = Color.white;
+        mat.SetTextureScale("_BaseMap", new Vector2(depth / 18f, len / 18f));
+        mat.SetFloat("_Smoothness", 0.28f);
         EditorUtility.SetDirty(mat);
         return mat;
     }

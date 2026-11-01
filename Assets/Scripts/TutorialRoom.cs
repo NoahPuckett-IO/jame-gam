@@ -6,7 +6,7 @@ using UnityEngine.SceneManagement;
 // at the end of each station drops away once its lesson is done. Finishing the last one goes back to the menu
 public class TutorialRoom : MonoBehaviour
 {
-    public enum Goal { Reach, PickUp, StopOn }
+    public enum Goal { Reach, PickUp }
 
     [System.Serializable]
     public class Lesson
@@ -14,7 +14,7 @@ public class TutorialRoom : MonoBehaviour
         public string icon, title, body;
         public string[] keys;
         public Goal goal;
-        public Bounds area;         // Reach and StopOn: where Henry has to be
+        public Bounds area;         // Reach: where Henry has to be
         public Transform gate;      // dropped when the lesson is done; may be empty
         public Transform respawn;   // the checkpoint for this lesson; may be empty
     }
@@ -26,17 +26,14 @@ public class TutorialRoom : MonoBehaviour
     [SerializeField] string doneIcon, doneTitle = "YOU'RE READY", doneBody = "That's everything Henry needs. Heading back to the menu...";
 
     PlayerController player;
-    CharacterController body;
     TutorialPopup popup;
     Vector3 boxHome;
     Quaternion boxHomeRot;
     int current = -1;
-    float stillFor;
 
     public void Begin(PlayerController who)
     {
         player = who;
-        body = who.GetComponent<CharacterController>();
         popup = FindAnyObjectByType<TutorialPopup>();
         if (box != null)
         {
@@ -68,7 +65,7 @@ public class TutorialRoom : MonoBehaviour
     // a box left somewhere useless goes back to where it started when Henry respawns (R)
     void OnRespawned()
     {
-        if (box == null || box.IsHeld || current < 0 || current >= lessons.Length || lessons[current].goal == Goal.StopOn) return;
+        if (box == null || box.IsHeld || current < 0 || current >= lessons.Length) return;
         box.transform.SetPositionAndRotation(boxHome, boxHomeRot);
     }
 
@@ -86,7 +83,6 @@ public class TutorialRoom : MonoBehaviour
         if (l.respawn != null) player.SetCheckpoint(l.respawn.position, l.respawn.rotation);
         if (popup != null) popup.Show(this, l.icon, l.title, l.body, l.keys);
         Debug.Log($"[Tutorial] lesson {index + 1}: {l.title}");
-        stillFor = 0f;
         current = index;
     }
 
@@ -106,11 +102,6 @@ public class TutorialRoom : MonoBehaviour
         {
             case Goal.PickUp:
                 return box != null && box.IsHeld;
-            case Goal.StopOn:
-                var v = body != null ? body.velocity : Vector3.zero;
-                v.y = 0f;
-                stillFor = l.area.Contains(p) && player.IsGrounded && v.magnitude < 1.5f ? stillFor + Time.deltaTime : 0f;
-                return stillFor > 0.35f;
             default:
                 return l.area.Contains(p);
         }

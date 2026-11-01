@@ -49,7 +49,7 @@ static partial class GroceryStoreBuilder
         ["drink"] = 0xe544, ["egg"] = 0xeacc, ["icecream"] = 0xea69, ["frozen"] = 0xeb3b, ["fish"] = 0xf1ea,
         ["pizza"] = 0xe552, ["cart"] = 0xe8cc, ["store"] = 0xea12, ["apple"] = 0xea80, ["eco"] = 0xea35,
         ["soup"] = 0xe7d3, ["wine"] = 0xf1e8, ["tag"] = 0xe54e, ["star"] = 0xe838, ["savings"] = 0xe2eb,
-        ["burger"] = 0xea61, ["grocery"] = 0xe547,
+        ["burger"] = 0xea61, ["grocery"] = 0xe547, ["laundry"] = 0xe54a,
         ["run"] = 0xe566, ["walk"] = 0xe536, ["balance"] = 0xeaf6, ["hand"] = 0xe769, ["stairs"] = 0xf1a9,
         ["jump"] = 0xeacf, ["bolt"] = 0xea0b, ["box"] = 0xe1a1, ["ski"] = 0xe509, ["check"] = 0xe86c,
         ["school"] = 0xe80c, ["play"] = 0xe037, ["settings"] = 0xe8b8, ["close"] = 0xe5cd, ["game"] = 0xea28, ["bulb"] = 0xe0f0,
@@ -286,7 +286,7 @@ static partial class GroceryStoreBuilder
                 for (int l = 0; l < layers; l++)
                 {
                     if (rng.NextDouble() < 0.03) continue;
-                    var p = Spawn(t.prefab, parent, t.yaw + 90 + (dir > 0 ? 180 : 0) + rand(-4f, 4f), s);
+                    var p = SpawnProduct(t, parent, t.yaw + 90 + (dir > 0 ? 180 : 0) + rand(-4f, 4f), s);
                     PlaceOnFloor(p, new Vector3(x + w / 2, y + l * h, zFront + dir * (dz / 2 + r * (dz + gap))));
                 }
                 x += w + gap;
@@ -364,7 +364,7 @@ static partial class GroceryStoreBuilder
             var at = new Vector3(x, tops[tops.Count - 1], z);
             if (placed.Any(o => new Vector2(o.at.x - x, o.at.z - z).magnitude < o.radius + radius)) continue;
             placed.Add((at, radius));
-            var p = Spawn(t.prefab, parent, t.yaw + (float)rng.NextDouble() * 360f, t.size / Mathf.Max(t.bounds.x, t.bounds.y, t.bounds.z));
+            var p = SpawnProduct(t, parent, t.yaw + (float)rng.NextDouble() * 360f, t.size / Mathf.Max(t.bounds.x, t.bounds.y, t.bounds.z));
             PlaceOnFloor(p, at);
             AddBoxColliders(p);
         }
@@ -411,7 +411,7 @@ static partial class GroceryStoreBuilder
             float slot = width / n;
             float s = Mathf.Min(slot * 0.7f / Mathf.Max(t.bounds.x, t.bounds.z), height * 0.4f / t.bounds.y);
             float yaw = Mathf.Atan2(normal.x, normal.z) * Mathf.Rad2Deg + (alongX ? 0 : 90);
-            var p = Spawn(t.prefab, parent, t.yaw + 90 + yaw, s);
+            var p = SpawnProduct(t, parent, t.yaw + 90 + yaw, s);
             PlaceOnFloor(p, new Vector3(center.x, ledgeY, center.z) + along * (-width / 2 + (i + 0.5f) * slot) + normal * 0.12f * Scale);
         }
     }

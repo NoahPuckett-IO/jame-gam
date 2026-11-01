@@ -23,6 +23,16 @@ static partial class GroceryStoreBuilder
                 var m = mats[i];
                 if (m == null) continue;
                 string path = AssetDatabase.GetAssetPath(m);
+                // a model part that lost its material (the toaster, the door frame) falls back to URP's default
+                if (path.StartsWith("Packages/") && m.name == "Lit")
+                {
+                    var steel = GetMaterial("Brushed Steel", new Color(0.62f, 0.64f, 0.67f));
+                    steel.SetFloat("_Metallic", 0.75f);
+                    steel.SetFloat("_Smoothness", 0.42f);
+                    mats[i] = steel;
+                    changed = true;
+                    continue;
+                }
                 if (!path.EndsWith(".fbx", System.StringComparison.OrdinalIgnoreCase)) continue;
 
                 if (!copies.TryGetValue(m, out var matte))
@@ -39,13 +49,57 @@ static partial class GroceryStoreBuilder
                     matte.SetFloat("_Metallic", 0f);
                     matte.SetFloat("_EnvironmentReflections", 0.3f);
                     matte.SetFloat("_Cull", 0f);
+                    // the supermarket pack uses the 3ds Max physical shader, which ignores _Smoothness: its
+                    // reflections came in at roughness 0, so shelves, counters and carts shone like wet plastic
+                    // and the few metal parts were mirrors
+                    if (matte.HasProperty("_REFLECTIONS_ROUGHNESS"))
+                    {
+                        bool metal = matte.HasProperty("_METALNESS") && matte.GetFloat("_METALNESS") > 0.5f;
+                        matte.SetFloat("_REFLECTIONS_ROUGHNESS", metal ? 0.5f : 0.72f);
+                        matte.SetFloat("_REFLECTIONS_WEIGHT", metal ? 0.8f : 0.45f);
+                    }
                     matte.doubleSidedGI = true;
+                    EditorUtility.SetDirty(matte);
                     copies[m] = matte;
                 }
                 mats[i] = matte;
                 changed = true;
             }
             if (changed) r.sharedMaterials = mats;
+        }
+    }
+
+    // URP's default smoothness of 0.5 gives every plain material a hard white highlight under the store's lights.
+    // Paper, card, wood, sponge and painted walls get a proper dull finish; plastics and metal keep a little sheen
+    static readonly (string name, float smooth, float metal)[] Finishes =
+    {
+        ("Wall", 0.12f, 0f), ("Sidewalk", 0.08f, 0f), ("LightFixture", 0.3f, 0f),
+        ("Cardboard Box", 0.1f, 0f), ("Cardboard Box Inside", 0.05f, 0f), ("Cardboard Insert", 0.05f, 0f),
+        ("Receipt", 0.06f, 0f), ("Paper Plate", 0.08f, 0f), ("Paper Plate Rim", 0.08f, 0f), ("Ink", 0.12f, 0f),
+        ("PriceTag", 0.22f, 0f), ("PriceRail", 0.3f, 0f), ("SignFrame", 0.3f, 0f), ("SignDisc", 0.25f, 0f),
+        ("Talker Red", 0.2f, 0f), ("Talker Yellow", 0.2f, 0f), ("Talker Green", 0.2f, 0f), ("Talker Orange", 0.2f, 0f),
+        ("Cereal 0 Body Color", 0.2f, 0f), ("Cereal 1 Body Color", 0.2f, 0f), ("Cereal 2 Body Color", 0.2f, 0f),
+        ("Cereal 3 Body Color", 0.2f, 0f), ("Cereal 4 Body Color", 0.2f, 0f), ("Cereal 5 Body Color", 0.2f, 0f),
+        ("Cracker", 0.06f, 0f), ("Cracker Dots", 0.04f, 0f), ("Sponge Yellow", 0.03f, 0f), ("Sponge Green", 0.03f, 0f),
+        ("Mop Strands", 0.03f, 0f), ("Mop Handle", 0.4f, 0f), ("Mop Socket", 0.35f, 0f), ("Bucket Grey", 0.3f, 0f),
+        ("Broom Handle", 0.2f, 0f), ("Broom Block", 0.35f, 0f), ("Ruler", 0.28f, 0f), ("Caution Yellow", 0.35f, 0f),
+        ("Spot Ring", 0.15f, 0f), ("Popsicle Wood", 0.1f, 0f), ("Chopstick Wood", 0.15f, 0f), ("Toothpick Wood", 0.1f, 0f),
+        ("Wooden Spoon", 0.18f, 0f), ("Floss", 0.3f, 0f), ("Wire", 0.35f, 0f), ("Ladder Hook", 0.35f, 0.3f),
+        ("Freezer Body", 0.3f, 0f), ("Freezer Trim", 0.3f, 0f), ("CoolerBody", 0.3f, 0f), ("CoolerShelf", 0.35f, 0.4f),
+        ("Vac Bumper", 0.25f, 0f), ("Vac Bristle", 0.05f, 0f), ("Bread Clip Blue", 0.4f, 0f),
+        ("Jar Lid Rim", 0.35f, 0.4f), ("Matchbox", 0.15f, 0f), ("Strike Strip", 0.05f, 0f),
+        ("Matchbox Label", 0.15f, 0f), ("Dirt Path", 0.03f, 0f), ("Forest Floor", 0.03f, 0f), ("Tutorial Light Panel", 0.3f, 0f),
+    };
+
+    static void TuneFinishes()
+    {
+        foreach (var (name, smooth, metal) in Finishes)
+        {
+            var m = AssetDatabase.LoadAssetAtPath<Material>($"{MatFolder}/{name}.mat");
+            if (m == null) continue;
+            m.SetFloat("_Smoothness", smooth);
+            m.SetFloat("_Metallic", metal);
+            EditorUtility.SetDirty(m);
         }
     }
 

@@ -233,7 +233,7 @@ static partial class GroceryStoreBuilder
         {
             if (!raiseToRim && placed >= maxItems) return;
             var at = center + right * ((i + 0.5f) * stepX - innerX / 2) + fwd * ((j + 0.5f) * stepZ - innerZ / 2);
-            var p = Spawn(t.prefab, parent, tr.eulerAngles.y + t.yaw + (rng.Next(2) * 90) + rng.Next(-8, 8), s);
+            var p = SpawnProduct(t, parent, tr.eulerAngles.y + t.yaw + (rng.Next(2) * 90) + rng.Next(-8, 8), s);
             PlaceOnFloor(p, new Vector3(at.x, baseY + 0.02f, at.z));
             placed++;
         }

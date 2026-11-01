@@ -20,7 +20,7 @@ static partial class GroceryStoreBuilder
             var aisle = BuildAisle(5, store, edge - shelf.gondolaDepth / 2, units, aisleLength, shelfPrefab, shelf);
             StockAisle(aisle, shelf, aisleLength, Stock[Stock.Length - 1], sides: new[] { 1 });
         }
-        HangAisleSign(store, x, zS, 5, "CLEANING SUPPLIES", 0);
+        HangAisleSign(store, x, zS, 5, "CLEANING SUPPLIES", 0, "SOAP • MOPS • VACUUMS", "laundry");
         Seal(root, "Above Aisle 5", new Vector3(edge - shelf.gondolaDepth / 2, (ShelfHeight - 0.4f + WallHeight) / 2, 0), new Vector3(shelf.gondolaDepth, WallHeight - ShelfHeight + 0.4f, aisleLength));
 
         EndBlock(root, "South Block", edge - shelf.gondolaDepth, edge, -wallZ, zS, out _);
@@ -38,6 +38,8 @@ static partial class GroceryStoreBuilder
         float zMid = (zS + zN) / 2;
         var can = BeanCanBuilder.GetOrCreate();
         var crate = BoxPrefab(BoxKind.Sealed);
+        var wooden = Usable(AssetDatabase.LoadAssetAtPath<GameObject>($"{PlatformerFolder}/crate.fbx"), $"{PlatformerFolder}/crate.fbx");
+        var fruit = Measure(new[] { ("Apple", 0.09f), ("k:orange", 0.08f), ("k:lemon", 0.07f), ("k:pear", 0.1f) });
         for (int tries = 0; spots.Count < 16 && tries < 400; tries++)
         {
             var p = new Vector2(x + ((float)rng.NextDouble() - 0.5f) * (WalkwayWidth - 10f), Mathf.Lerp(zS + 22f, zN - 12f, (float)rng.NextDouble()));
@@ -48,12 +50,43 @@ static partial class GroceryStoreBuilder
             if (!clear) continue;
             spots.Add(p);
             var at = new Vector3(p.x, 0, p.y);
-            int kind = spots.Count % 3;
+            // five kinds of cover: a cereal box stood up, two cans, two boxes, a cereal box knocked on its side (a
+            // long low wall) and a pair of produce crates with fruit on them
+            int kind = spots.Count % 5;
             if (kind == 0)
             {
                 var b = CerealBox(root, rng.Next(6));
                 b.transform.rotation = Quaternion.Euler(0, rng.Next(360), 0);
                 PlaceOnFloor(b, at);
+            }
+            else if (kind == 3)
+            {
+                var b = CerealBox(root, rng.Next(6));
+                b.transform.rotation = Quaternion.Euler(0, rng.Next(360), 90);
+                PlaceOnFloor(b, at);
+            }
+            else if (kind == 4 && wooden != null)
+            {
+                float yaw = rng.Next(360);
+                var across = Quaternion.Euler(0, yaw, 0) * Vector3.right;
+                foreach (int s in new[] { -1, 1 })
+                {
+                    var c = SpawnSized(wooden, root, 4.4f, yaw + rng.Next(-8, 8));
+                    c.name = "Produce Crate";
+                    PlaceOnFloor(c, at + across * s * 2.3f);
+                    AddBoxColliders(c);
+                    // a few pieces of fruit on the lid, one to each quarter so none sits inside another
+                    var top = GetBounds(c);
+                    for (int k = 0; k < 4 && fruit.Count > 0; k++)
+                    {
+                        if (rng.NextDouble() < 0.3) continue;
+                        var t = fruit[rng.Next(fruit.Count)];
+                        var f = SpawnProduct(t, root, rng.Next(360), t.size / Mathf.Max(t.bounds.x, t.bounds.y, t.bounds.z));
+                        var q = new Vector3((k % 2 - 0.5f) * 1.9f, 0, (k / 2 - 0.5f) * 1.9f);
+                        PlaceOnFloor(f, new Vector3(top.center.x, top.max.y, top.center.z) + Quaternion.Euler(0, yaw, 0) * q);
+                        AddBoxColliders(f);
+                    }
+                }
             }
             else if (kind == 1 && can != null)
             {
@@ -143,7 +176,7 @@ static partial class GroceryStoreBuilder
         root.SetParent(parent);
         root.SetPositionAndRotation(at, Quaternion.Euler(0, 180, 0));
         var body = GetMaterial("Vac Body", new Color(0.13f, 0.14f, 0.16f));
-        body.SetFloat("_Smoothness", 0.7f);
+        body.SetFloat("_Smoothness", 0.55f);
         var bumper = GetMaterial("Vac Bumper", new Color(0.32f, 0.33f, 0.36f));
         var plate = GetMaterial("Vac Plate", new Color(0.72f, 0.74f, 0.78f));
         plate.SetFloat("_Metallic", 0.8f);

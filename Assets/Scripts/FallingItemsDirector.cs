@@ -60,12 +60,26 @@ public class FallingItemsDirector : MonoBehaviour
         if (templates == null || templates.Length == 0) return;
         if (player == null) player = FindAnyObjectByType<PlayerController>();
         FallingItem.DashMaterial = dashMaterial;
+        target.y = SurfaceBelow(target);
         var from = new Vector3(shelfX, shelfHeights[Random.Range(0, shelfHeights.Length)] + 1f, target.z + Random.Range(-3f, 3f));
         var item = Instantiate(templates[Random.Range(0, templates.Length)]);
         item.SetActive(true);
         foreach (var c in item.GetComponentsInChildren<Collider>()) c.enabled = false;
         var fi = item.AddComponent<FallingItem>();
         StartCoroutine(fi.Run(from, target, warn > 0f ? warn : warnTime, player));
+    }
+
+    // the top of whatever still thing is under the spot (a crate, the tipped cart, a box pile), so the item and its
+    // warning land on it instead of sinking to the floor inside it. Henry and anything that moves don't count
+    float SurfaceBelow(Vector3 at)
+    {
+        float top = 0f;
+        foreach (var h in Physics.RaycastAll(new Vector3(at.x, 40f, at.z), Vector3.down, 41f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+        {
+            if (h.collider.attachedRigidbody != null || (player != null && h.transform.IsChildOf(player.transform))) continue;
+            top = Mathf.Max(top, h.point.y);
+        }
+        return top;
     }
 
     public void Setup(GameObject[] items, float x, float half, float zFrom, float zTo, Material dash)
